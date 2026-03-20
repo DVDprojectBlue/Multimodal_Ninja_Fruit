@@ -3,3 +3,13 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+
+.venv/
+venv/
+ENV/
+env/
