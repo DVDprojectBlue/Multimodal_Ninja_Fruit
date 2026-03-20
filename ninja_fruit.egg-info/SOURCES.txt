@@ -1,0 +1,8 @@
+README.md
+pyproject.toml
+run_game.py
+ninja_fruit.egg-info/PKG-INFO
+ninja_fruit.egg-info/SOURCES.txt
+ninja_fruit.egg-info/dependency_links.txt
+ninja_fruit.egg-info/requires.txt
+ninja_fruit.egg-info/top_level.txt
