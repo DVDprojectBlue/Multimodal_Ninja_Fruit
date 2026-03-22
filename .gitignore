@@ -1,0 +1,17 @@
+.vscode/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+ninja_fruit.egg-info/
+*.egg-info/
+*.egg-info
+.installed.cfg
+*.egg
+MANIFEST
+
+
+.venv/
+venv/
+ENV/
+env/
