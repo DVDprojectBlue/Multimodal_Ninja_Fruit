@@ -1,0 +1,18 @@
+# virtual env
+venv/
+.env/
+
+# python
+__pycache__/
+*.pyc
+
+# vscode
+.vscode/
+
+# data
+data/
+
+# system
+.DS_Store
+
+models

@@ -1,0 +1,6 @@
+Metadata-Version: 2.4
+Name: body_movement_detection
+Version: 0.1.0
+Summary: Body movement detection using MediaPipe
+Requires-Dist: mediapipe
+Requires-Dist: opencv-python
