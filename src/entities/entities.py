@@ -29,7 +29,10 @@ class Entity(pygame.sprite.Sprite):
         self.move()
         
         if self.rect.top > 700:
-            self.kill() 
+            self.kill()
+
+    def check_slice(self, p1, p2):
+        return p1 and p2 and self.rect.clipline(p1, p2)
 
 
 class Spawner:
