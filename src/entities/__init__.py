@@ -1,1 +1,1 @@
-from .entities import Fruit, Bomb, Spawner
+from .entities import Entity, Spawner

@@ -6,3 +6,5 @@ FPS = 60
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 GRAVITY = 0.3
+FRUIT = "Fruit"
+BOMB = "Bomb"

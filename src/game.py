@@ -1,6 +1,6 @@
 import pygame
 import src.constants as constants
-from src.entities import Fruit, Bomb, Spawner
+from src.entities import Entity, Spawner
 
 class NinjaFruitGame:
     def __init__(self, title="Multimodal Ninja Fruit"):
@@ -37,10 +37,9 @@ class NinjaFruitGame:
         self.quit_rect = self.quit_surf.get_rect(center=(constants.SCREEN_WIDTH // 2, 540))
 
         # Utworzenie obiektów do zarządzania owocami i bombami
-        self.fruits = pygame.sprite.Group()
-        self.bombs = pygame.sprite.Group()
-        self.spawner = Spawner(self.fruits, self.bombs, ['apple','melon','lemon'], 'bomb')
-        self.spawner.set_chances(0.5, 0.2)
+        self.entity_group = pygame.sprite.Group()
+        self.spawner = Spawner(self.entity_group, ['apple','melon','lemon'], 'bomb')
+        self.spawner.set_chances(0.4, 0.1)
 
     def run(self):
         while self.running:
@@ -54,6 +53,7 @@ class NinjaFruitGame:
         pygame.quit()
 
     def _handle_events(self):
+        # Obsługa eventów
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
@@ -61,12 +61,13 @@ class NinjaFruitGame:
                 self.running = False
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_s and self.state == 0:
                 self.state = 1
+        
+        #Kolizja myszki z owocami/bombami
 
     def _update(self):
         # Tu można robić logikę gry
         self.spawner.update()
-        self.fruits.update()
-        self.bombs.update()
+        self.entity_group.update()
 
     def _draw(self):
         self.screen.fill(constants.BLACK)
@@ -77,7 +78,6 @@ class NinjaFruitGame:
             self.screen.blit(self.quit_surf, self.quit_rect)
             self.screen.blit(self.start_surf, self.start_rect)
         elif self.state == 1:
-            self.fruits.draw(self.screen)
-            self.bombs.draw(self.screen)
+            self.entity_group.draw(self.screen)
 
         pygame.display.flip()
