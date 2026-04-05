@@ -82,7 +82,11 @@ class NinjaFruitGame:
                 if entity.check_slice(self.prev_mouse_pos, self.current_mouse_pos):
                     if entity.entity_type == constants.FRUIT:
                         self.score += 1
+                        x, y, vx, vy = entity.get_state()
                         entity.kill()
+
+                        self.entity_group.add(Entity(None, constants.HALF, x, vx-3, int(-4+vy/2), y=y, half='left'))
+                        self.entity_group.add(Entity(None, constants.HALF, x, vx+3, int(-4+vy/2), y=y, half='right'))
 
                     elif entity.entity_type == constants.BOMB:
                         self.lives -= 1

@@ -3,15 +3,22 @@ import random
 import src.constants as constants
 
 class Entity(pygame.sprite.Sprite):
-    def __init__(self, image, entity_type, x, vx, vy):
+    def __init__(self, image, entity_type, x, vx, vy, y=constants.SCREEN_HEIGHT, half='left'):
         super().__init__()
         self.entity_type = entity_type
         self.image = pygame.Surface((40, 40), pygame.SRCALPHA) # docelowo self.image = image
         if self.entity_type == constants.FRUIT:
             pygame.draw.circle(self.image, (255, 0, 0), (20, 20), 20)
         elif self.entity_type == constants.BOMB:
-            pygame.draw.circle(self.image, (255, 255, 0), (20, 20), 20) 
-        self.rect = self.image.get_rect(midbottom = (x, constants.SCREEN_HEIGHT))
+            pygame.draw.circle(self.image, (255, 255, 0), (20, 20), 20)
+        elif self.entity_type == constants.HALF:
+            rect = self.image.get_rect()
+            if half == 'left':
+                pygame.draw.arc(self.image, (255, 0, 0), rect, 1.57, 4.71, 40)
+            else:
+                pygame.draw.arc(self.image, (255, 0, 0), rect, -1.57, 1.57, 40)
+
+        self.rect = self.image.get_rect(midbottom = (x, y))
 
         self.vx = vx
         self.vy = vy
@@ -30,6 +37,9 @@ class Entity(pygame.sprite.Sprite):
         
         if self.rect.top > 700:
             self.kill()
+
+    def get_state(self):
+        return (self.rect.x, self.rect.y, self.vx, self.vy)
 
     def check_slice(self, p1, p2):
         return p1 and p2 and self.rect.clipline(p1, p2)
