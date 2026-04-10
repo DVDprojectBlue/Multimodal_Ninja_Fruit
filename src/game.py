@@ -1,6 +1,6 @@
 import pygame
 import src.constants as constants
-from src.entities import Fruit, Bomb, Spawner
+from src.entities import Entity, Spawner
 
 class NinjaFruitGame:
     def __init__(self, title="Multimodal Ninja Fruit"):
@@ -37,23 +37,26 @@ class NinjaFruitGame:
         self.quit_rect = self.quit_surf.get_rect(center=(constants.SCREEN_WIDTH // 2, 540))
 
         # Utworzenie obiektów do zarządzania owocami i bombami
-        self.fruits = pygame.sprite.Group()
-        self.bombs = pygame.sprite.Group()
-        self.spawner = Spawner(self.fruits, self.bombs, ['apple','melon','lemon'], 'bomb')
-        self.spawner.set_chances(0.5, 0.2)
+        self.entity_group = pygame.sprite.Group()
+        self.spawner = Spawner(self.entity_group, ['apple','melon','lemon'], 'bomb')
+        self.spawner.set_chances(0.4, 0.1)
+
+        # Cięcie owoców/bomb
+        self.lives = 3
+        self.score = 0
+        self.prev_mouse_pos = None
+        self.current_mouse_pos = None
 
     def run(self):
         while self.running:
             self._handle_events()
-
-            if self.state == 1:
-                self._update()
-
+            self._update()
             self._draw()
             self.clock.tick(constants.FPS)
         pygame.quit()
 
     def _handle_events(self):
+        # Obsługa eventów
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
@@ -61,23 +64,66 @@ class NinjaFruitGame:
                 self.running = False
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_s and self.state == 0:
                 self.state = 1
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_r and self.state == 2:
+                self.score = 0
+                self.lives = 3
+                self.state = 1
 
     def _update(self):
         # Tu można robić logikę gry
-        self.spawner.update()
-        self.fruits.update()
-        self.bombs.update()
+        if self.state == 1:
+            self.spawner.update()
+            self.entity_group.update()
+
+            self.prev_mouse_pos = self.current_mouse_pos
+            self.current_mouse_pos = pygame.mouse.get_pos()
+
+            for entity in self.entity_group:
+                if entity.check_slice(self.prev_mouse_pos, self.current_mouse_pos):
+                    if entity.entity_type == constants.FRUIT:
+                        self.score += 1
+                        x, y, vx, vy = entity.get_state()
+                        entity.kill()
+
+                        self.entity_group.add(Entity(None, constants.HALF, x, vx-3, int(-4+vy/2), y=y, half='left'))
+                        self.entity_group.add(Entity(None, constants.HALF, x, vx+3, int(-4+vy/2), y=y, half='right'))
+
+                    elif entity.entity_type == constants.BOMB:
+                        self.lives -= 1
+                        entity.kill()
+                if self.lives <= 0:
+                    self.state = 2
 
     def _draw(self):
         self.screen.fill(constants.BLACK)
+        # 0 - menu  1 - gra  2 - game over
 
         if self.state == 0:
             for surf, rect in zip(self.line_surfs, self.line_rects):
                 self.screen.blit(surf, rect)
             self.screen.blit(self.quit_surf, self.quit_rect)
             self.screen.blit(self.start_surf, self.start_rect)
+
         elif self.state == 1:
-            self.fruits.draw(self.screen)
-            self.bombs.draw(self.screen)
+            self.entity_group.draw(self.screen)
+            if self.prev_mouse_pos and self.current_mouse_pos:
+                pygame.draw.line(self.screen, (255, 255, 255), self.prev_mouse_pos, self.current_mouse_pos, 3)
+            
+            self.score_surf = self.small_font.render(f"Score: {self.score}", True, constants.WHITE)
+            self.score_rect = self.score_surf.get_rect(topright=(constants.SCREEN_WIDTH - 20, 20))
+            self.screen.blit(self.score_surf, self.score_rect)
+
+            self.lives_surf = self.small_font.render(f"Lives: {self.lives}", True, constants.WHITE)
+            self.lives_rect = self.lives_surf.get_rect(topright=(constants.SCREEN_WIDTH - 20, 50))
+            self.screen.blit(self.lives_surf, self.lives_rect)
+        
+        elif self.state == 2:
+            self.game_over_surf = self.font.render(f"GAME OVER  Score: {self.score}", True, constants.WHITE)
+            self.game_over_rect = self.game_over_surf.get_rect(center=(constants.SCREEN_WIDTH // 2, 200))
+            self.screen.blit(self.game_over_surf, self.game_over_rect)
+
+            self.restart_surf = self.small_font.render("Press R to restart", True, constants.WHITE)
+            self.restart_rect = self.restart_surf.get_rect(center=(constants.SCREEN_WIDTH // 2, 300))
+            self.screen.blit(self.restart_surf, self.restart_rect)
 
         pygame.display.flip()

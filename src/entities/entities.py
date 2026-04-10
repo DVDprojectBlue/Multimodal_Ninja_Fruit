@@ -2,38 +2,23 @@ import pygame
 import random
 import src.constants as constants
 
-class Fruit(pygame.sprite.Sprite):
-    def __init__(self, image, x, vx, vy):
+class Entity(pygame.sprite.Sprite):
+    def __init__(self, image, entity_type, x, vx, vy, y=constants.SCREEN_HEIGHT, half='left'):
         super().__init__()
+        self.entity_type = entity_type
         self.image = pygame.Surface((40, 40), pygame.SRCALPHA) # docelowo self.image = image
-        pygame.draw.circle(self.image, (255, 0, 0), (20, 20), 20) 
-        self.rect = self.image.get_rect(midbottom = (x, constants.SCREEN_HEIGHT))
+        if self.entity_type == constants.FRUIT:
+            pygame.draw.circle(self.image, (255, 0, 0), (20, 20), 20)
+        elif self.entity_type == constants.BOMB:
+            pygame.draw.circle(self.image, (255, 255, 0), (20, 20), 20)
+        elif self.entity_type == constants.HALF:
+            rect = self.image.get_rect()
+            if half == 'left':
+                pygame.draw.arc(self.image, (255, 0, 0), rect, 1.57, 4.71, 40)
+            else:
+                pygame.draw.arc(self.image, (255, 0, 0), rect, -1.57, 1.57, 40)
 
-        self.vx = vx
-        self.vy = vy
-        self.gravity = constants.GRAVITY
-
-    def move(self):
-        self.rect.x += self.vx
-        self.rect.y += self.vy
-        self.vy += self.gravity
-
-        if self.vy > 15: 
-            self.vy = 15
-
-    def update(self):
-        self.move()
-        
-        if self.rect.top > 700:
-            self.kill() 
-
-
-class Bomb(pygame.sprite.Sprite):
-    def __init__(self, image, x, vx, vy):
-        super().__init__()
-        self.image = pygame.Surface((40, 40), pygame.SRCALPHA) # docelowo self.image = image
-        pygame.draw.circle(self.image, (255, 255, 0), (20, 20), 20) 
-        self.rect = self.image.get_rect(midbottom = (x, constants.SCREEN_HEIGHT))
+        self.rect = self.image.get_rect(midbottom = (x, y))
 
         self.vx = vx
         self.vy = vy
@@ -53,11 +38,16 @@ class Bomb(pygame.sprite.Sprite):
         if self.rect.top > 700:
             self.kill()
 
+    def get_state(self):
+        return (self.rect.x, self.rect.y, self.vx, self.vy)
+
+    def check_slice(self, p1, p2):
+        return p1 and p2 and self.rect.clipline(p1, p2)
+
 
 class Spawner:
-    def __init__(self, fruits_group, bombs_group, fruits_images, bomb_image):
-        self.fruits = fruits_group
-        self.bombs = bombs_group
+    def __init__(self, entity_group, fruits_images, bomb_image):
+        self.entity_group = entity_group
 
         self.bomb_image = bomb_image
         self.fruits_images = fruits_images
@@ -81,7 +71,7 @@ class Spawner:
             vx = random.randint(1, 6) * (-1 if x > constants.SCREEN_WIDTH/2 else 1)
             vy = -random.randint(11,18)
 
-            self.fruits.add(Fruit(fruit_image, x, vx, vy))
+            self.entity_group.add(Entity(fruit_image, constants.FRUIT, x, vx, vy))
             self.timer_fruit = 0
 
         if spawn_bomb < self.bomb_chance + self.timer_bomb/1000 and self.timer_bomb > 140:
@@ -89,5 +79,5 @@ class Spawner:
             vx = random.randint(1, 6) * (-1 if x > constants.SCREEN_WIDTH/2 else 1)
             vy = -random.randint(11,18)
 
-            self.bombs.add(Bomb(self.bomb_image, x, vx, vy))
+            self.entity_group.add(Entity(self.bomb_image, constants.BOMB, x, vx, vy))
             self.timer_bomb = 0
