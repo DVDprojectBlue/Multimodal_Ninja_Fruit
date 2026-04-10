@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import threading
+import time
 
 import cv2
 import numpy as np
@@ -58,12 +60,55 @@ class EyeTracker:
 		self._gestures = EyeGestures_v3()
 		self._gestures.setFixation(fixation_threshold)
 		self._capture = VideoCapture(camera_source)
+		self._state_lock = threading.Lock()
+		self._latest_result: TrackerStepResult | None = None
+		self._calibrate_requested = False
+		self._running = False
+		self._worker_thread: threading.Thread | None = None
 
 	@property
 	def gestures(self):
 		return self._gestures
 
+	def upload_calibration_map(self, calibration_map: np.ndarray) -> None:
+		with self._state_lock:
+			self._gestures.uploadCalibrationMap(calibration_map, context=self.context)
+
+	def set_calibrate(self, calibrate: bool) -> None:
+		with self._state_lock:
+			self._calibrate_requested = calibrate
+
+	def get_latest_result(self) -> TrackerStepResult | None:
+		with self._state_lock:
+			return self._latest_result
+
+	def start_background(self) -> None:
+		if self._running:
+			return
+
+		self._running = True
+		self._worker_thread = threading.Thread(target=self._worker_loop, daemon=True)
+		self._worker_thread.start()
+
+	def _worker_loop(self) -> None:
+		while self._running:
+			with self._state_lock:
+				calibrate = self._calibrate_requested
+
+			result = self._step_impl(calibrate)
+
+			if result is not None:
+				with self._state_lock:
+					self._latest_result = result
+
+			# Small backoff to reduce CPU spinning when camera drops frames.
+			if result is None:
+				time.sleep(0.001)
+
 	def step(self, calibrate: bool) -> TrackerStepResult | None:
+		return self._step_impl(calibrate)
+
+	def _step_impl(self, calibrate: bool) -> TrackerStepResult | None:
 		ret, frame = self._capture.read()
 		if not ret or frame is None:
 			return None
@@ -75,13 +120,14 @@ class EyeTracker:
 		frame = np.flip(frame, axis=1)
 
 		try:
-			event, calibration = self._gestures.step(
-				frame,
-				calibrate,
-				self.screen_width,
-				self.screen_height,
-				context=self.context,
-			)
+			with self._state_lock:
+				event, calibration = self._gestures.step(
+					frame,
+					calibrate,
+					self.screen_width,
+					self.screen_height,
+					context=self.context,
+				)
 		except (TypeError, IndexError, AttributeError, ValueError):
 			# eyeGestures can fail on individual frames when landmarks are not detected.
 			return None
@@ -89,11 +135,14 @@ class EyeTracker:
 		if event is None:
 			return TrackerStepResult(gaze=None, calibration=None, debug_frame=None)
 
+		with self._state_lock:
+			algorithm = self._gestures.whichAlgorithm(context=self.context)
+
 		gaze = GazeSample(
 			point=(int(event.point[0]), int(event.point[1])),
 			fixation=float(event.fixation),
 			saccades=bool(event.saccades),
-			algorithm=self._gestures.whichAlgorithm(context=self.context),
+			algorithm=algorithm,
 		)
 
 		calibration_sample = None
@@ -110,6 +159,11 @@ class EyeTracker:
 		)
 
 	def close(self) -> None:
+		self._running = False
+		if self._worker_thread is not None and self._worker_thread.is_alive():
+			self._worker_thread.join(timeout=1.0)
+		self._worker_thread = None
+
 		if self._capture is None:
 			return
 

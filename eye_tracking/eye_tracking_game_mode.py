@@ -55,6 +55,7 @@ class EyeTrackingGameMode(BaseGameMode):
             context=config["eye_context"],
             fixation_threshold=config["fixation_threshold"],
         )
+        self.eye_tracker.start_background()
         self.context = config["eye_context"]
         self.calibration_points = config["calibration_points"]
 
@@ -66,6 +67,10 @@ class EyeTrackingGameMode(BaseGameMode):
             total=0,
             is_complete=False,
         )
+        self._fps_font = pygame.font.Font(None, 28)
+        self._fps_value = 0.0
+        self._fps_frame_count = 0
+        self._fps_last_sample_ms = pygame.time.get_ticks()
         self._calibration_progress = 0
         self._calibration_total = 0
         self._previous_calibration_point = (-1, -1)
@@ -106,7 +111,7 @@ class EyeTrackingGameMode(BaseGameMode):
         if self.calibration_points > 0:
             calibration_map = calibration_map[: self.calibration_points]
 
-        self.eye_tracker.gestures.uploadCalibrationMap(calibration_map, context=self.context)
+        self.eye_tracker.upload_calibration_map(calibration_map)
 
         self._calibration_progress = 0
         self._calibration_total = len(calibration_map)
@@ -119,6 +124,7 @@ class EyeTrackingGameMode(BaseGameMode):
             is_complete=False,
         )
         self.calibration_active = self._calibration_total > 0
+        self.eye_tracker.set_calibrate(self.calibration_active)
 
     def _build_calibration_map(self) -> np.ndarray:
         x = np.arange(0, 1.0 + self.CALIBRATION_GRID_STEP, self.CALIBRATION_GRID_STEP)
@@ -135,11 +141,12 @@ class EyeTrackingGameMode(BaseGameMode):
         return None
 
     def update(self):
-        if self.calibration_active:
-            tracker_result = self.eye_tracker.step(calibrate=True)
-            if tracker_result is None:
-                return
+        self.eye_tracker.set_calibrate(self.calibration_active)
+        tracker_result = self.eye_tracker.get_latest_result()
+        if tracker_result is None:
+            return
 
+        if self.calibration_active:
             self.last_tracker_result = tracker_result
 
             if tracker_result.calibration:
@@ -159,10 +166,11 @@ class EyeTrackingGameMode(BaseGameMode):
 
                 if calibration_complete:
                     self.calibration_active = False
+                    self.eye_tracker.set_calibrate(False)
             return
 
         super().update()
-        self.last_tracker_result = self.eye_tracker.step(calibrate=False)
+        self.last_tracker_result = tracker_result
 
     def draw(self, screen):
         super().draw(screen)
@@ -171,6 +179,20 @@ class EyeTrackingGameMode(BaseGameMode):
             self._draw_calibration_state(screen)
 
         self._draw_gaze_cursor(screen)
+        self._draw_fps_counter(screen)
+
+    def _draw_fps_counter(self, screen):
+        self._fps_frame_count += 1
+        now_ms = pygame.time.get_ticks()
+        elapsed_ms = now_ms - self._fps_last_sample_ms
+
+        if elapsed_ms >= 250:
+            self._fps_value = (self._fps_frame_count * 1000.0) / elapsed_ms
+            self._fps_frame_count = 0
+            self._fps_last_sample_ms = now_ms
+
+        fps_text = self._fps_font.render(f"FPS: {self._fps_value:.1f}", True, constants.WHITE)
+        screen.blit(fps_text, (12, 10))
 
     def _draw_gaze_cursor(self, screen):
         if self.last_tracker_result and self.last_tracker_result.gaze:
