@@ -34,3 +34,12 @@ This project requires Python 3. On some older systems the `python` command invok
 ```bash
 python3 run_game.py
 ```
+
+### How to run Vosk listener part
+
+Install system dependency (Linux):
+
+```bash
+sudo apt update
+sudo apt install -y portaudio19-dev
+```

@@ -10,7 +10,9 @@ readme = "README.md"
 requires-python = ">=3.8"
 keywords = ["game", "pygame", "ninja", "arcade"]
 dependencies = [
-    "pygame"
+    "pygame",
+    "vosk",
+    "sounddevice"
 ]
 
 [project.urls]

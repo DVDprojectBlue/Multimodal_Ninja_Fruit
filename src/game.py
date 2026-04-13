@@ -1,6 +1,8 @@
 import pygame
 import src.constants as constants
-from src.entities import Entity, Spawner
+
+from src.entities import Spawner, Entity
+from src.voskListener import VoskListener
 
 class NinjaFruitGame:
     def __init__(self, title="Multimodal Ninja Fruit"):
@@ -10,8 +12,10 @@ class NinjaFruitGame:
         self.clock = pygame.time.Clock()
         self.running = True
         self.state = 0 # 0 - menu, 1 -gra
+        self.voice_listener = None
         
         self._prepare_assets()
+        self._setup_voice_control()
 
     def _prepare_assets(self):
         # Definicja napisów, żeby było cokolwiek -- tymczasowe
@@ -31,9 +35,9 @@ class NinjaFruitGame:
             current_y += surf.get_height()
 
         # Napisy menu
-        self.start_surf = self.small_font.render("Press S to start", True, constants.WHITE)
+        self.start_surf = self.small_font.render("Press S or say START", True, constants.WHITE)
         self.start_rect = self.start_surf.get_rect(center=(constants.SCREEN_WIDTH // 2, 500))
-        self.quit_surf = self.small_font.render("Press ESC to quit", True, constants.WHITE)
+        self.quit_surf = self.small_font.render("Press ESC or say QUIT", True, constants.WHITE)
         self.quit_rect = self.quit_surf.get_rect(center=(constants.SCREEN_WIDTH // 2, 540))
 
         # Utworzenie obiektów do zarządzania owocami i bombami
@@ -47,27 +51,59 @@ class NinjaFruitGame:
         self.prev_mouse_pos = None
         self.current_mouse_pos = None
 
+    def _setup_voice_control(self):
+        phrases = [
+            (["start", "run", "go", "begin"], self._start_game),
+            (["menu", "back"], self._go_to_menu),
+            (["restart", "retry", "play again"], self._restart_game),
+            (["quit", "exit", "stop"], self._quit_game),
+        ]
+
+        self.voice_listener = VoskListener(
+            phrases=phrases,
+            use_grammar=True,
+            grammar_confidence_threshold=0.7
+        )
+        self.voice_listener.start()
+
+    def _start_game(self):
+        if self.state == 0:
+            self.state = 1
+
+    def _go_to_menu(self):
+        self.state = 0
+
+    def _restart_game(self):
+        if self.state == 2:
+            self.score = 0
+            self.lives = 3
+            self.state = 1
+
+    def _quit_game(self):
+        self.running = False
+
     def run(self):
         while self.running:
             self._handle_events()
             self._update()
             self._draw()
             self.clock.tick(constants.FPS)
+
+        if self.voice_listener is not None:
+            self.voice_listener.stop()
         pygame.quit()
 
     def _handle_events(self):
         # Obsługa eventów
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                self.running = False
+                self._quit_game()
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                self.running = False
+                self._quit_game()
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_s and self.state == 0:
-                self.state = 1
+                self._start_game()
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_r and self.state == 2:
-                self.score = 0
-                self.lives = 3
-                self.state = 1
+                self._restart_game()
 
     def _update(self):
         # Tu można robić logikę gry
