@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ninja-fruit"
+version = "0.1.0"
+description = "Multimodal Ninja Fruit Game by DVD Project Blue."
+readme = "README.md"
+requires-python = ">=3.8"
+keywords = ["game", "pygame", "ninja", "arcade"]
+dependencies = [
+    "pygame"
+]
+
+[project.urls]
+"Repository" = "https://github.com/DVDprojectBlue/Multimodal_Ninja_Fruit"
