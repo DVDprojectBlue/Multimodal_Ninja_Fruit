@@ -6,7 +6,6 @@ import time
 
 from body_movement_detection.config import HANDS_MODEL_PATH
 
-
 class HandsDetector:
     def __init__(self, smoothing=0.7):
         self.latest_result = None
