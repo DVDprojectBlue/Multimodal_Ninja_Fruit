@@ -229,6 +229,8 @@ class NinjaFruitGame:
 
         elif self.state == 1:
             self.entity_group.draw(self.screen)
+
+            # stare rysowanie ruchu
             # if self.prev_pos and self.current_pos:
             #     pygame.draw.line(self.screen, (255, 255, 255), self.prev_pos, self.current_pos, 3)
 
@@ -253,7 +255,7 @@ class NinjaFruitGame:
             self.lives_rect = self.lives_surf.get_rect(topright=(constants.SCREEN_WIDTH - 20, 50))
             self.screen.blit(self.lives_surf, self.lives_rect)
 
-            # tryb sterowania w rogu
+            # tryb sterowania
             ctrl_surf = self.small_font.render(
                 f"[{self.control_mode.upper()}]", True, (150, 150, 150)
             )
