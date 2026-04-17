@@ -3,8 +3,7 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
-from body_movement_detection.config import POSE_MODEL_PATH
-
+from .config import POSE_MODEL_PATH
 
 class PoseDetector:
     def __init__(self):

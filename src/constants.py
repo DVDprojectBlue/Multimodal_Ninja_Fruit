@@ -9,3 +9,5 @@ GRAVITY = 0.3
 FRUIT = "Fruit"
 BOMB = "Bomb"
 HALF = "Half"
+
+CAM_URL = "http://192.168.10.67:8080/video"
