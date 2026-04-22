@@ -65,7 +65,10 @@ class Spawner:
         self.timer_bomb += 1
         spawn_bomb = random.random()
 
-        if spawn_fruit < self.fruit_chance + self.timer_fruit/1000 and self.timer_fruit > 75:
+        min_fruit_time = int(140 * (1 - self.fruit_chance))
+        min_bomb_time = int(140 * (1 - self.bomb_chance))
+
+        if spawn_fruit < self.fruit_chance + self.timer_fruit/1000 and self.timer_fruit > min_fruit_time:
             fruit_image = random.choice(self.fruits_images)
             x = random.randint(50, constants.SCREEN_WIDTH-50)
             vx = random.randint(1, 6) * (-1 if x > constants.SCREEN_WIDTH/2 else 1)
@@ -74,7 +77,7 @@ class Spawner:
             self.entity_group.add(Entity(fruit_image, constants.FRUIT, x, vx, vy))
             self.timer_fruit = 0
 
-        if spawn_bomb < self.bomb_chance + self.timer_bomb/1000 and self.timer_bomb > 140:
+        if spawn_bomb < self.bomb_chance + self.timer_bomb/1000 and self.timer_bomb > min_bomb_time:
             x = random.randint(50, constants.SCREEN_WIDTH-50)
             vx = random.randint(1, 6) * (-1 if x > constants.SCREEN_WIDTH/2 else 1)
             vy = -random.randint(11,18)

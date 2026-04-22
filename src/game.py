@@ -12,18 +12,37 @@ class NinjaFruitGame:
     CONTROL_MOUSE = "mouse"
     CONTROL_HAND = "hand"
 
+    MODE_CLASSIC = "CLASSIC"
+    MODE_TIME_ATTACK = "TIME_ATTACK"
+    MODE_TIME_TIME = 45
+    MODE_LEVELS = "LEVELS"
+    MODE_LEVELS_TIME = 20
+
     def __init__(self, title="Multimodal Ninja Fruit"):
         pygame.init()
         self.screen = pygame.display.set_mode((constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT))
         pygame.display.set_caption(title)
         self.clock = pygame.time.Clock()
         self.running = True
-        self.state = 0 # 0 - menu, 1 - gra
+        self.state = 0 # 0 - menu, 1 - gra, 2 - game over, 3 - level transition
         self.voice_listener = None
         self.hand_detector = None
         self.control_mode = self.CONTROL_MOUSE
 
-        self.pointer_trail = deque(maxlen=25) # bufor do rysowania śladu ruchu
+        self.best_score_classic = 0
+        self.best_score_time = 0
+        self.best_score_level = 0
+
+        self.game_mode = self.MODE_CLASSIC
+        self.time_left = self.MODE_TIME_TIME * constants.FPS
+        self.times_up = 0
+
+        self.level = 1
+        self.level_time = self.MODE_LEVELS_TIME * constants.FPS 
+        self.transition_timer = 0
+        self.level_end = 0
+
+        self.pointer_trail = deque(maxlen=15) # bufor do rysowania śladu ruchu
 
         self._prepare_assets()
         self._setup_voice_control()
@@ -49,14 +68,16 @@ class NinjaFruitGame:
 
         # Napisy menu
         self.start_surf = self.small_font.render("Press S or say START", True, constants.WHITE)
-        self.start_rect = self.start_surf.get_rect(center=(constants.SCREEN_WIDTH // 2, 500))
+        self.start_rect = self.start_surf.get_rect(center=(constants.SCREEN_WIDTH // 2, 420))
         self.quit_surf = self.small_font.render("Press ESC or say QUIT", True, constants.WHITE)
-        self.quit_rect = self.quit_surf.get_rect(center=(constants.SCREEN_WIDTH // 2, 540))
+        self.quit_rect = self.quit_surf.get_rect(center=(constants.SCREEN_WIDTH // 2, 460))
 
         # Utworzenie obiektów do zarządzania owocami i bombami
         self.entity_group = pygame.sprite.Group()
         self.spawner = Spawner(self.entity_group, ['apple','melon','lemon'], 'bomb')
-        self.spawner.set_chances(0.4, 0.1)
+        self.fruit_chance_current = 0.5 
+        self.bomb_chance_current = 0.3
+        self.spawner.set_chances(self.fruit_chance_current, self.bomb_chance_current)
 
         # Cięcie owoców/bomb
         self.lives = 3
@@ -66,19 +87,24 @@ class NinjaFruitGame:
 
     def _setup_voice_control(self):
         phrases = [
-            (["start", "run", "go", "begin"], self._start_game),
-            (["menu", "back"], self._go_to_menu),
+            (["start", "run", "go", "begin", "play"], self._start_game),
+            (["menu", "back", "man"], self._go_to_menu),
             (["restart", "retry", "play again"], self._restart_game),
             (["quit", "exit", "stop"], self._quit_game),
             (["mouse", "mouse control"], self._set_mouse_control), # sterowanie myszką
             (["hand", "hand control"], self._set_hand_control), # sterowanie ręką
+            (["classic", "normal mode", "normal", "one"], self._set_classic_mode),
+            (["time", "time attack", "two", "too"], self._set_time_mode),
+            (["level", "levels", "level mode", "three", "free"], self._set_levels_mode),
             # TODO: sterowanie wzrokiem i inne
         ]
 
         self.voice_listener = VoskListener(
             phrases=phrases,
-            use_grammar=True,
-            grammar_confidence_threshold=0.7
+            use_grammar=False,
+            confidence_threshold=0.2,
+            grammar_confidence_threshold=0.2,
+            vad_threshold=500
         )
         self.voice_listener.start()
 
@@ -90,6 +116,7 @@ class NinjaFruitGame:
             self.state = 1
 
     def _go_to_menu(self):
+        self._restart_game()
         self.state = 0
 
     def _restart_game(self):
@@ -99,7 +126,70 @@ class NinjaFruitGame:
             self.entity_group.empty()
             self.prev_pos = None
             self.current_pos = None
-            self.state = 1
+            self.times_up = 0
+            if self.state == 2:
+                self.state = 1
+            else:
+                self.state = 0
+            if self.game_mode == self.MODE_TIME_ATTACK:
+                self.time_left = self.MODE_TIME_TIME * constants.FPS
+            if self.game_mode == self.MODE_LEVELS:
+                self.level = 1
+                self.level_time = self.MODE_LEVELS_TIME * constants.FPS
+
+    def _set_classic_mode(self):
+        self.game_mode = self.MODE_CLASSIC
+        self._restart_game()
+
+    def _update_classic_difficulty(self):
+        self.fruit_chance_current += 0.0001
+        self.bomb_chance_current += 0.00008
+
+        self.fruit_chance_current = min(self.fruit_chance_current, 0.8)
+        self.bomb_chance_current = min(self.bomb_chance_current, 0.65)
+
+        self.spawner.set_chances(self.fruit_chance_current, self.bomb_chance_current)
+
+    def _set_time_mode(self):
+        self.spawner.set_chances(0.7, 0.55)
+        self.game_mode = self.MODE_TIME_ATTACK
+        self._restart_game()
+    
+    def _update_time(self):
+        self.time_left -= 1
+        if self.time_left <= 0:
+            self.score += self.lives * 10
+            self.state = 2
+            self.times_up = 1
+
+    def _set_levels_mode(self):
+        self.game_mode = self.MODE_LEVELS
+        self._restart_game()
+
+    def _update_level(self):
+        self.level_time -= 1
+
+        if self.level == 1:
+            self.spawner.set_chances(0.55, 0.3)
+        elif self.level == 2:
+            self.spawner.set_chances(0.40, 0.85)
+        elif self.level == 3:
+            self.spawner.set_chances(0.85, 0.40)
+        elif self.level == 4:
+            self.spawner.set_chances(0.8, 0.8)
+
+        if self.level_time <= 0:
+            self.level += 1
+            self.level_time = self.MODE_LEVELS_TIME * constants.FPS
+
+            if self.level > 4:
+                self.score += self.lives * 10
+                self.level_end = 1
+                self.state = 2
+            else:
+                self.state = 3
+                self.transition_timer = 2 * constants.FPS  
+                self.entity_group.empty()
 
     def _quit_game(self):
         self.running = False
@@ -169,10 +259,18 @@ class NinjaFruitGame:
                     self._start_game()
                 elif event.key == pygame.K_r and self.state == 2:
                     self._restart_game()
-                elif event.key == pygame.K_m:
+                elif event.key == pygame.K_m and self.state == 0:
                     self._set_mouse_control()
-                elif event.key == pygame.K_h:
+                elif event.key == pygame.K_h and self.state == 0:
                     self._set_hand_control()
+                elif event.key == pygame.K_1 and self.state == 0:
+                    self._set_classic_mode()
+                elif event.key == pygame.K_2 and self.state == 0:
+                    self._set_time_mode()
+                elif event.key == pygame.K_n and self.state == 2:
+                    self._go_to_menu()
+                elif event.key == pygame.K_3 and self.state == 0:
+                    self._set_levels_mode()
                 # TODO: inne skróty klawiszowe do sterowania itp.
 
     def _update(self):
@@ -209,6 +307,17 @@ class NinjaFruitGame:
                 if self.lives <= 0:
                     self.state = 2
 
+            if self.game_mode == self.MODE_CLASSIC:
+                self._update_classic_difficulty()
+            elif self.game_mode == self.MODE_TIME_ATTACK:
+                self._update_time()
+            elif self.game_mode == self.MODE_LEVELS:
+                self._update_level()
+        elif self.state == 3:
+            self.transition_timer -= 1
+            if self.transition_timer <= 0:
+                self.state = 1
+
     def _draw(self):
         self.screen.fill(constants.BLACK)
         # 0 - menu  1 - gra  2 - game over
@@ -220,12 +329,25 @@ class NinjaFruitGame:
             self.screen.blit(self.start_surf, self.start_rect)
 
             # pokaż aktualny tryb
+            best_text = f"Best Classic: {self.best_score_classic}  |  Best Time: {self.best_score_time}  |  Best Level: {self.best_score_level}"
+            best_surf = self.small_font.render(best_text, True, (120, 200, 255))
+            best_rect = best_surf.get_rect(center=(constants.SCREEN_WIDTH // 2, 500))
+            self.screen.blit(best_surf, best_rect)
+
             mode_text = f"Control: {self.control_mode.upper()}  (M=mouse, H=hand)"
             mode_surf = self.small_font.render(mode_text, True, (200, 200, 0))
             mode_rect = mode_surf.get_rect(
-                center=(constants.SCREEN_WIDTH // 2, 580)
+                center=(constants.SCREEN_WIDTH // 2, 540)
             )
             self.screen.blit(mode_surf, mode_rect)
+
+            mode_info = self.small_font.render(
+            f"Mode: {self.game_mode} (1=classic, 2=time, 3=levels)", True, (180, 180, 180)
+            )
+            mode_info_rect = mode_info.get_rect(
+                center=(constants.SCREEN_WIDTH // 2, 580)
+            )
+            self.screen.blit(mode_info, mode_info_rect)
 
         elif self.state == 1:
             self.entity_group.draw(self.screen)
@@ -260,14 +382,76 @@ class NinjaFruitGame:
                 f"[{self.control_mode.upper()}]", True, (150, 150, 150)
             )
             self.screen.blit(ctrl_surf, (10, 10))
+
+            if self.game_mode == self.MODE_TIME_ATTACK:
+                seconds = self.time_left // constants.FPS
+                minutes = seconds // 60
+                seconds = seconds % 60
+
+                time_surf = self.small_font.render(
+                    f"Time: {minutes:02}:{seconds:02}", True, (255, 200, 50)
+                )
+                self.screen.blit(time_surf, (10, 40))
+            
+            if self.game_mode == self.MODE_LEVELS:
+                seconds = self.level_time // constants.FPS
+
+                time_surf = self.small_font.render(
+                    f"Time: {seconds:02}", True, (255, 200, 50)
+                )
+                self.screen.blit(time_surf, (10, 40))
+
+                level_surf = self.small_font.render(f"Level: {self.level}", True, (100, 255, 100))
+                self.screen.blit(level_surf, (10, 70))
         
         elif self.state == 2:
-            self.game_over_surf = self.font.render(f"GAME OVER  Score: {self.score}", True, constants.WHITE)
-            self.game_over_rect = self.game_over_surf.get_rect(center=(constants.SCREEN_WIDTH // 2, 200))
-            self.screen.blit(self.game_over_surf, self.game_over_rect)
+            if self.game_mode == self.MODE_TIME_ATTACK and self.times_up:
+                self.game_over_surf = self.font.render(f"Time's Up  Score: {self.score}", True, constants.WHITE)
+                self.game_over_rect = self.game_over_surf.get_rect(center=(constants.SCREEN_WIDTH // 2, 200))
+                self.screen.blit(self.game_over_surf, self.game_over_rect)
+                if self.best_score_time < self.score:
+                    self.best_score_time = self.score
+
+            elif self.game_mode == self.MODE_LEVELS and self.level_end:
+                line1 = self.font.render("All levels completed", True, constants.WHITE)
+                line2 = self.font.render(f"Score: {self.score}", True, constants.WHITE)
+                rect1 = line1.get_rect(center=(constants.SCREEN_WIDTH // 2, 110))
+                rect2 = line2.get_rect(center=(constants.SCREEN_WIDTH // 2, 220))
+                self.screen.blit(line1, rect1)
+                self.screen.blit(line2, rect2)
+
+                if self.best_score_level < self.score:
+                    self.best_score_level = self.score
+
+            else:
+                self.game_over_surf = self.font.render(f"GAME OVER  Score: {self.score}", True, constants.WHITE)
+                self.game_over_rect = self.game_over_surf.get_rect(center=(constants.SCREEN_WIDTH // 2, 200))
+                self.screen.blit(self.game_over_surf, self.game_over_rect)
+                if self.game_mode == self.MODE_TIME_ATTACK and self.best_score_time < self.score:
+                    self.best_score_time = self.score
+                elif self.game_mode == self.MODE_CLASSIC and self.best_score_classic < self.score:
+                    self.best_score_classic = self.score
+                elif self.game_mode == self.MODE_LEVELS and self.best_score_level < self.score:
+                    self.best_score_level = self.score
 
             self.restart_surf = self.small_font.render("Press R to restart", True, constants.WHITE)
             self.restart_rect = self.restart_surf.get_rect(center=(constants.SCREEN_WIDTH // 2, 300))
             self.screen.blit(self.restart_surf, self.restart_rect)
+
+            self.menu_surf = self.small_font.render("Press N to go to menu", True, constants.WHITE)
+            self.menu_rect = self.menu_surf.get_rect(center=(constants.SCREEN_WIDTH // 2, 340))
+            self.screen.blit(self.menu_surf, self.menu_rect)
+
+        elif self.state == 3:
+            text = f"NEXT LEVEL"
+
+            surf = self.font.render(text, True, constants.WHITE)
+            rect = surf.get_rect(center=(constants.SCREEN_WIDTH // 2, constants.SCREEN_HEIGHT // 2))
+
+            self.screen.blit(surf, rect)
+
+            sub = self.small_font.render("Get Ready...", True, (200, 200, 200))
+            sub_rect = sub.get_rect(center=(constants.SCREEN_WIDTH // 2, constants.SCREEN_HEIGHT // 2 + 80))
+            self.screen.blit(sub, sub_rect)
 
         pygame.display.flip()
