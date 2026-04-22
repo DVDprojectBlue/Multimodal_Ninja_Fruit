@@ -5,18 +5,21 @@ import src.constants as constants
 from src.entities import Spawner, Entity
 from src.voskListener import VoskListener
 from src.handControl import PoseDetector, HandsDetector
+from src.eye_tracking.eye_tracking_game_mode import EyeTrackingGameMode
 
 class NinjaFruitGame:
 
     # TODO: dodać inne tryby sterowania
     CONTROL_MOUSE = "mouse"
     CONTROL_HAND = "hand"
+    CONTROL_EYE = "eye"
 
     MODE_CLASSIC = "CLASSIC"
     MODE_TIME_ATTACK = "TIME_ATTACK"
     MODE_TIME_TIME = 45
     MODE_LEVELS = "LEVELS"
     MODE_LEVELS_TIME = 20
+    STATE_CALIBRATION = 4
 
     def __init__(self, title="Multimodal Ninja Fruit"):
         pygame.init()
@@ -27,7 +30,9 @@ class NinjaFruitGame:
         self.state = 0 # 0 - menu, 1 - gra, 2 - game over, 3 - level transition
         self.voice_listener = None
         self.hand_detector = None
+        self.eye_mode = None
         self.control_mode = self.CONTROL_MOUSE
+        self._pending_start_after_calibration = False
 
         self.best_score_classic = 0
         self.best_score_time = 0
@@ -93,6 +98,8 @@ class NinjaFruitGame:
             (["quit", "exit", "stop"], self._quit_game),
             (["mouse", "mouse control"], self._set_mouse_control), # sterowanie myszką
             (["hand", "hand control"], self._set_hand_control), # sterowanie ręką
+            (["eye", "eyes", "gaze", "eye control", "gaze control"], self._set_eye_control),
+            (["calibrate", "recalibrate", "calibration"], self._recalibrate_eye),
             (["classic", "normal mode", "normal", "one"], self._set_classic_mode),
             (["time", "time attack", "two", "too"], self._set_time_mode),
             (["level", "levels", "level mode", "three", "free"], self._set_levels_mode),
@@ -113,11 +120,23 @@ class NinjaFruitGame:
 
     def _start_game(self):
         if self.state == 0:
+            if self.control_mode == self.CONTROL_EYE:
+                if not self._start_eye_mode():
+                    self.state = 0
+                    return
+
+                if self.eye_mode is not None and self.eye_mode.is_calibrating():
+                    self._pending_start_after_calibration = True
+                    self.state = self.STATE_CALIBRATION
+                    return
+
+            self._pending_start_after_calibration = False
             self.state = 1
 
     def _go_to_menu(self):
         self._restart_game()
         self.state = 0
+        self._pending_start_after_calibration = False
 
     def _restart_game(self):
         if self.state == 2:
@@ -136,6 +155,7 @@ class NinjaFruitGame:
             if self.game_mode == self.MODE_LEVELS:
                 self.level = 1
                 self.level_time = self.MODE_LEVELS_TIME * constants.FPS
+        self._pending_start_after_calibration = False
 
     def _set_classic_mode(self):
         self.game_mode = self.MODE_CLASSIC
@@ -200,6 +220,32 @@ class NinjaFruitGame:
     def _set_hand_control(self):
         self.set_control_mode(self.CONTROL_HAND)
 
+    def _set_eye_control(self):
+        self.set_control_mode(self.CONTROL_EYE)
+
+    def _recalibrate_eye(self):
+        if self.control_mode == self.CONTROL_EYE and self.eye_mode is not None:
+            self.eye_mode.reset_session()
+            if self.state == 0:
+                self._pending_start_after_calibration = True
+
+    def _shutdown_eye_mode(self):
+        if self.eye_mode is not None:
+            self.eye_mode.shutdown()
+            self.eye_mode = None
+        self._pending_start_after_calibration = False
+
+    def _start_eye_mode(self):
+        if self.eye_mode is None:
+            width, height = self.screen.get_size()
+            self.eye_mode = EyeTrackingGameMode(width, height)
+
+        if self.eye_mode.start():
+            return True
+
+        self._shutdown_eye_mode()
+        return False
+
     def _get_pointer_position(self):
 
         #Zwraca (x, y) w pikselach gry
@@ -209,6 +255,9 @@ class NinjaFruitGame:
 
         if self.control_mode == self.CONTROL_HAND:
             return self.hand_detector.get_screen_position(constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT)
+
+        if self.control_mode == self.CONTROL_EYE and self.eye_mode is not None:
+            return self.eye_mode.get_control_position()
 
         return None
     
@@ -220,16 +269,25 @@ class NinjaFruitGame:
         # reset pozycji
         self.prev_pos = None
         self.current_pos = None
+        self.pointer_trail.clear()
 
         if mode == self.CONTROL_HAND:
+            self._shutdown_eye_mode()
             self.hand_detector.start()
             self.control_mode = self.CONTROL_HAND
             print("[CONTROL] Switched to HAND")
 
         elif mode == self.CONTROL_MOUSE:
+            self._shutdown_eye_mode()
             self.hand_detector.stop()
             self.control_mode = self.CONTROL_MOUSE
             print("[CONTROL] Switched to MOUSE")
+
+        elif mode == self.CONTROL_EYE:
+            self.hand_detector.stop()
+            self._shutdown_eye_mode()
+            self.control_mode = self.CONTROL_EYE
+            print("[CONTROL] Switched to EYE")
         
         # TODO: inne tryby sterowania (wzrok itp.)
 
@@ -244,6 +302,7 @@ class NinjaFruitGame:
             self.voice_listener.stop()
         if self.hand_detector is not None:
             self.hand_detector.stop()
+        self._shutdown_eye_mode()
         # TODO: zatrzymać inne moduły sterowania
         pygame.quit()
 
@@ -263,6 +322,8 @@ class NinjaFruitGame:
                     self._set_mouse_control()
                 elif event.key == pygame.K_h and self.state == 0:
                     self._set_hand_control()
+                elif event.key == pygame.K_e and self.state == 0:
+                    self._set_eye_control()
                 elif event.key == pygame.K_1 and self.state == 0:
                     self._set_classic_mode()
                 elif event.key == pygame.K_2 and self.state == 0:
@@ -271,11 +332,16 @@ class NinjaFruitGame:
                     self._go_to_menu()
                 elif event.key == pygame.K_3 and self.state == 0:
                     self._set_levels_mode()
+                elif event.key == pygame.K_c and self.state == 1:
+                    self._recalibrate_eye()
                 # TODO: inne skróty klawiszowe do sterowania itp.
 
     def _update(self):
         # Tu można robić logikę gry
         if self.state == 1:
+            if self.control_mode == self.CONTROL_EYE and self.eye_mode is not None:
+                self.eye_mode.update()
+
             self.spawner.update()
             self.entity_group.update()
 
@@ -313,6 +379,17 @@ class NinjaFruitGame:
                 self._update_time()
             elif self.game_mode == self.MODE_LEVELS:
                 self._update_level()
+        elif self.state == self.STATE_CALIBRATION:
+            if self.control_mode != self.CONTROL_EYE or self.eye_mode is None:
+                self._pending_start_after_calibration = False
+                self.state = 0
+                return
+
+            self.eye_mode.update()
+
+            if self._pending_start_after_calibration and not self.eye_mode.is_calibrating():
+                self._pending_start_after_calibration = False
+                self.state = 1
         elif self.state == 3:
             self.transition_timer -= 1
             if self.transition_timer <= 0:
@@ -334,7 +411,7 @@ class NinjaFruitGame:
             best_rect = best_surf.get_rect(center=(constants.SCREEN_WIDTH // 2, 500))
             self.screen.blit(best_surf, best_rect)
 
-            mode_text = f"Control: {self.control_mode.upper()}  (M=mouse, H=hand)"
+            mode_text = f"Control: {self.control_mode.upper()}  (M=mouse, H=hand, E=eye)"
             mode_surf = self.small_font.render(mode_text, True, (200, 200, 0))
             mode_rect = mode_surf.get_rect(
                 center=(constants.SCREEN_WIDTH // 2, 540)
@@ -345,7 +422,7 @@ class NinjaFruitGame:
             f"Mode: {self.game_mode} (1=classic, 2=time, 3=levels)", True, (180, 180, 180)
             )
             mode_info_rect = mode_info.get_rect(
-                center=(constants.SCREEN_WIDTH // 2, 580)
+                center=(constants.SCREEN_WIDTH // 2, 590)
             )
             self.screen.blit(mode_info, mode_info_rect)
 
@@ -403,6 +480,24 @@ class NinjaFruitGame:
 
                 level_surf = self.small_font.render(f"Level: {self.level}", True, (100, 255, 100))
                 self.screen.blit(level_surf, (10, 70))
+
+            if self.control_mode == self.CONTROL_EYE and self.eye_mode is not None:
+                self.eye_mode.draw_overlay(self.screen)
+
+                recalibrate_surf = self.small_font.render("C = recalibrate", True, (120, 220, 220))
+                self.screen.blit(recalibrate_surf, (10, 100))
+
+        elif self.state == self.STATE_CALIBRATION:
+            title = self.font.render("Calibrating", True, constants.WHITE)
+            title_rect = title.get_rect(center=(constants.SCREEN_WIDTH // 2, 120))
+            self.screen.blit(title, title_rect)
+
+            info = self.small_font.render("Keep your gaze on the target points", True, (200, 200, 200))
+            info_rect = info.get_rect(center=(constants.SCREEN_WIDTH // 2, 200))
+            self.screen.blit(info, info_rect)
+
+            if self.eye_mode is not None:
+                self.eye_mode.draw_overlay(self.screen)
         
         elif self.state == 2:
             if self.game_mode == self.MODE_TIME_ATTACK and self.times_up:
