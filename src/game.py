@@ -51,6 +51,8 @@ class NinjaFruitGame:
         self._prepare_assets()
         self._setup_voice_control()
         self._setup_motion_control()
+
+        self.new_pos = self._get_pointer_position()
         # TODO: setup sterowania wzrokiem itp.
 
     def _prepare_assets(self):
@@ -316,11 +318,19 @@ class NinjaFruitGame:
                 if event.key == pygame.K_ESCAPE:
                     self._quit_game()
                 elif event.key == pygame.K_s and self.state == 0:
+                    pygame.mixer.music.load(self.music_game)
+                    pygame.mixer.music.set_volume(0.5)
+                    pygame.mixer.music.play(-1)
                     self._start_game()
                 elif event.key == pygame.K_r and self.state == 2:
+                    pygame.mixer.music.load(self.music_game)
+                    pygame.mixer.music.set_volume(0.5)
+                    pygame.mixer.music.play(-1)
                     self._restart_game()
                 elif event.key == pygame.K_m and self.state == 0:
                     self._set_mouse_control()
+                    print("M")
+                    print(self.state)
                 elif event.key == pygame.K_h and self.state == 0:
                     self._set_hand_control()
                 elif event.key == pygame.K_1 and self.state == 0:
@@ -332,27 +342,7 @@ class NinjaFruitGame:
                 elif event.key == pygame.K_3 and self.state == 0:
                     self._set_levels_mode()
                 # TODO: inne skróty klawiszowe do sterowania itp.
-                self.running = False
-            elif (
-                event.type == pygame.KEYDOWN
-                and event.key == pygame.K_s
-                and self.state == 0
-            ):
-                self.state = 1
-                pygame.mixer.music.load(self.music_game)
-                pygame.mixer.music.set_volume(0.5)
-                pygame.mixer.music.play(-1)
-            elif (
-                event.type == pygame.KEYDOWN
-                and event.key == pygame.K_r
-                and self.state == 2
-            ):
-                self.score = 0
-                self.lives = 3
-                self.state = 1
-                pygame.mixer.music.load(self.music_game)
-                pygame.mixer.music.set_volume(0.5)
-                pygame.mixer.music.play(-1)
+                # self.running = False
 
     def _update(self):
         # Tu można robić logikę gry
@@ -361,12 +351,13 @@ class NinjaFruitGame:
             self.entity_group.update()
 
             # uniwersalne pobieranie pozycji sterowania bez względu na tryb sterowania
-            new_pos = self._get_pointer_position()
+            self.prev_pos = self.new_pos
+            self.new_pos = self._get_pointer_position()
 
-            if new_pos is not None:
+            if self.new_pos is not None:
                 self.prev_pos = self.current_pos
-                self.current_pos = new_pos
-                self.pointer_trail.append(new_pos)
+                self.current_pos = self.new_pos
+                self.pointer_trail.append(self.new_pos)
             else:
                 self.prev_pos = None
                 self.current_pos = None
@@ -376,7 +367,7 @@ class NinjaFruitGame:
             # self.current_mouse_pos = pygame.mouse.get_pos()
 
             for entity in self.entity_group:
-                if entity.check_slice(self.prev_mouse_pos, self.current_mouse_pos):
+                if entity.check_slice(self.prev_pos, self.new_pos):
                     if entity.entity_type == constants.FRUIT:
                         self.score += 1
                         x, y, vx, vy = entity.get_state()
@@ -578,13 +569,21 @@ class NinjaFruitGame:
                 ):
                     self.best_score_level = self.score
 
-            # self.restart_surf = self.small_font.render("Press R to restart", True, constants.WHITE)
-            # self.restart_rect = self.restart_surf.get_rect(center=(constants.SCREEN_WIDTH // 2, 300))
-            # self.screen.blit(self.restart_surf, self.restart_rect)
+            self.restart_surf = self.small_font.render(
+                "Press R to restart", True, constants.WHITE
+            )
+            self.restart_rect = self.restart_surf.get_rect(
+                center=(constants.SCREEN_WIDTH // 2, 300)
+            )
+            self.screen.blit(self.restart_surf, self.restart_rect)
 
-            # self.menu_surf = self.small_font.render("Press N to go to menu", True, constants.WHITE)
-            # self.menu_rect = self.menu_surf.get_rect(center=(constants.SCREEN_WIDTH // 2, 340))
-            # self.screen.blit(self.menu_surf, self.menu_rect)
+            self.menu_surf = self.small_font.render(
+                "Press N to go to menu", True, constants.WHITE
+            )
+            self.menu_rect = self.menu_surf.get_rect(
+                center=(constants.SCREEN_WIDTH // 2, 340)
+            )
+            self.screen.blit(self.menu_surf, self.menu_rect)
 
             self.game_over_surf = self.font.render(
                 f"GAME OVER  Score: {self.score}", True, constants.WHITE

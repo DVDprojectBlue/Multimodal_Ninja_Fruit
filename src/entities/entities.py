@@ -9,21 +9,20 @@ class Entity(pygame.sprite.Sprite):
     ):
         super().__init__()
         self.entity_type = entity_type
-        # self.image = pygame.Surface((40, 40), pygame.SRCALPHA) # docelowo self.image = image
-        if self.entity_type == constants.FRUIT:
-            pygame.draw.circle(self.image, (255, 0, 0), (20, 20), 20)
-        elif self.entity_type == constants.BOMB:
-            pygame.draw.circle(self.image, (255, 255, 0), (20, 20), 20)
-        elif self.entity_type == constants.HALF:
-            rect = self.image.get_rect()
-            if half == "left":
-                pygame.draw.arc(self.image, (255, 0, 0), rect, 1.57, 4.71, 40)
-            else:
-                pygame.draw.arc(self.image, (255, 0, 0), rect, -1.57, 1.57, 40)
-
         raw = pygame.image.load(image).convert_alpha()
         self.image = pygame.transform.scale(raw, (64, 64))
         self.rect = self.image.get_rect(midbottom=(x, y))
+        # self.image = pygame.Surface((40, 40), pygame.SRCALPHA) # docelowo self.image = image
+        # if self.entity_type == constants.FRUIT:
+        #     pygame.draw.circle(self.image, (255, 0, 0), (20, 20), 20)
+        # elif self.entity_type == constants.BOMB:
+        #     pygame.draw.circle(self.image, (255, 255, 0), (20, 20), 20)
+        # elif self.entity_type == constants.HALF:
+        #     rect = self.image.get_rect()
+        #     if half == "left":
+        #         pygame.draw.arc(self.image, (255, 0, 0), rect, 1.57, 4.71, 40)
+        #     else:
+        #         pygame.draw.arc(self.image, (255, 0, 0), rect, -1.57, 1.57, 40)
 
         self.vx = vx
         self.vy = vy
