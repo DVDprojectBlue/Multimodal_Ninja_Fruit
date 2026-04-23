@@ -372,8 +372,8 @@ class NinjaFruitGame:
                 self.current_pos = None
                 self.pointer_trail.clear()
 
-            self.prev_mouse_pos = self.current_mouse_pos
-            self.current_mouse_pos = pygame.mouse.get_pos()
+            # self.prev_mouse_pos = self.current_mouse_pos
+            # self.current_mouse_pos = pygame.mouse.get_pos()
 
             for entity in self.entity_group:
                 if entity.check_slice(self.prev_mouse_pos, self.current_mouse_pos):
