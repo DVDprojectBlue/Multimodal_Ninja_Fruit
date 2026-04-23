@@ -277,6 +277,9 @@ class NinjaFruitGame:
         self.time_left -= 1
         if self.time_left <= 0:
             self.score += self.lives * 10
+            pygame.mixer.music.load(self.music_menu)
+            pygame.mixer.music.set_volume(0.5)
+            pygame.mixer.music.play(-1)
             self.state = 2
             self.times_up = 1
 
@@ -303,6 +306,9 @@ class NinjaFruitGame:
             if self.level > 4:
                 self.score += self.lives * 10
                 self.level_end = 1
+                pygame.mixer.music.load(self.music_menu)
+                pygame.mixer.music.set_volume(0.5)
+                pygame.mixer.music.play(-1)
                 self.state = 2
             else:
                 self.state = 3
@@ -527,6 +533,30 @@ class NinjaFruitGame:
     # def _draw(self):
     #     self.screen.fill(constants.BLACK)
     #     # 0 - menu  1 - gra  2 - game over
+    def draw_text_with_glow(
+        self,
+        screen,
+        font,
+        text,
+        center_pos,
+        color,
+        glow_color=(255, 255, 255),
+        glow_alpha=80,
+        glow_radius=2,
+    ):
+        base = font.render(text, True, color)
+
+        glow = font.render(text, True, glow_color)
+        glow.set_alpha(glow_alpha)
+
+        x, y = center_pos
+
+        # draw glow around
+        for dx in range(-glow_radius, glow_radius + 1):
+            for dy in range(-glow_radius, glow_radius + 1):
+                if dx != 0 or dy != 0:
+                    rect = glow.get_rect(center=(x + dx, y + dy))
+                    screen.blit(glow, rect)
 
     def draw_text_with_shadow(
         self,
@@ -648,9 +678,6 @@ class NinjaFruitGame:
             mode_text = (
                 f"Control: {self.control_mode.upper()}  (M=mouse, H=hand, E=eye)"
             )
-            mode_surf = self.small_font.render(mode_text, True, (200, 200, 0))
-            mode_rect = mode_surf.get_rect(center=(constants.SCREEN_WIDTH // 2, 540))
-            self.screen.blit(mode_surf, mode_rect)
 
             self.draw_text_with_shadow(
                 self.screen,
@@ -763,11 +790,22 @@ class NinjaFruitGame:
             center_x = constants.SCREEN_WIDTH // 2
 
             if self.game_mode == self.MODE_TIME_ATTACK and self.times_up:
+                self.draw_text_with_glow(
+                    self.screen,
+                    self.title_font,
+                    f"Time's Up  Score: {self.score}",
+                    (center_x, 250),
+                    constants.WHITE,
+                    glow_color=(255, 220, 180),
+                    glow_alpha=90,
+                    glow_radius=2,
+                )
+
                 self.draw_text_with_shadow(
                     self.screen,
                     self.title_font,
                     f"Time's Up  Score: {self.score}",
-                    (center_x, 200),
+                    (center_x, 250),
                     constants.WHITE,
                     offset=(3, 3),
                 )
@@ -776,13 +814,35 @@ class NinjaFruitGame:
                     self.best_score_time = self.score
 
             elif self.game_mode == self.MODE_LEVELS and self.level_end:
+                self.draw_text_with_glow(
+                    self.screen,
+                    self.title_font,
+                    "All levels completed",
+                    (center_x, 250),
+                    constants.WHITE,
+                    glow_color=(255, 220, 180),
+                    glow_alpha=90,
+                    glow_radius=2,
+                )
+
                 self.draw_text_with_shadow(
                     self.screen,
                     self.title_font,
                     "All levels completed",
-                    (center_x, 110),
+                    (center_x, 250),
                     constants.WHITE,
                     offset=(3, 3),
+                )
+
+                self.draw_text_with_glow(
+                    self.screen,
+                    self.title_font,
+                    f"Score: {self.score}",
+                    (center_x, 220),
+                    constants.WHITE,
+                    glow_color=(255, 220, 180),
+                    glow_alpha=90,
+                    glow_radius=2,
                 )
 
                 self.draw_text_with_shadow(
@@ -798,6 +858,17 @@ class NinjaFruitGame:
                     self.best_score_level = self.score
 
             else:
+                self.draw_text_with_glow(
+                    self.screen,
+                    self.title_font,
+                    f"GAME OVER  Score: {self.score}",
+                    (center_x, 250),
+                    constants.WHITE,
+                    glow_color=(255, 220, 180),
+                    glow_alpha=90,
+                    glow_radius=2,
+                )
+
                 self.draw_text_with_shadow(
                     self.screen,
                     self.title_font,
