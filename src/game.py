@@ -1,4 +1,5 @@
 import os
+import math
 import pygame
 from collections import deque
 
@@ -52,27 +53,65 @@ class NinjaFruitGame:
         self._setup_voice_control()
         self._setup_motion_control()
 
+        self.title_glow_time = 0.0
+
+        self.clock = pygame.time.Clock()
+
         self.new_pos = self._get_pointer_position()
         # TODO: setup sterowania wzrokiem itp.
 
     def _prepare_assets(self):
         # Definicja napisów, żeby było cokolwiek -- tymczasowe
-        font_path = pygame.font.match_font("Segoe UI")
-        self.font = pygame.font.Font(font_path, 96)
-        self.font.set_bold(True)
-        self.small_font = pygame.font.Font(font_path, 24)
+        title_font_path = pygame.font.match_font(
+            "assets/fonts/Noto_Serif_JP/static/NotoSerifJP-ExtraBold.ttf"
+        )
+        self.title_font = pygame.font.Font(title_font_path, 96)
+        self.title_font.set_bold(True)
 
-        lines = ["Ninja Fruit"]
+        medium_font_path = pygame.font.match_font(
+            "assets/fonts/Noto_Serif_JP/static/NotoSerifJP-SemiBold.ttf"
+        )
+        self.medium_font = pygame.font.Font(medium_font_path, 50)
+        self.medium_font.set_italic(True)
+
+        regular_font_path = pygame.font.match_font(
+            "assets/fonts/Noto_Serif_JP/static/NotoSerifJP-SemiBold.ttf"
+        )
+        self.small_font = pygame.font.Font(regular_font_path, 24)
+        self.small_font.set_italic(True)
+
+        # --- Tytuł ---
+        lines = ["NINJA FRUIT"]
+
         self.line_surfs = [
-            self.font.render(line, True, constants.WHITE) for line in lines
+            self.title_font.render(line, True, constants.TITLE_COLOR) for line in lines
         ]
 
         self.line_rects = []
-        current_y = 425
+
+        # 🔼 TYTUŁ WYŻEJ (np. górna 1/4 ekranu)
+        start_y = constants.SCREEN_HEIGHT * 0.55
+        spacing = 10
+
+        current_y = int(start_y)
+
+        self.start_surf = self.small_font.render(
+            "Press S to start", True, constants.WHITE
+        )
+        self.start_rect = self.start_surf.get_rect(
+            center=(constants.SCREEN_WIDTH // 2, constants.SCREEN_HEIGHT * 0.68)
+        )
+        self.quit_surf = self.small_font.render(
+            "Press ESC to quit", True, constants.WHITE
+        )
+        self.quit_rect = self.quit_surf.get_rect(
+            center=(constants.SCREEN_WIDTH // 2, constants.SCREEN_HEIGHT * 0.73)
+        )
+
         for surf in self.line_surfs:
             rect = surf.get_rect(center=(constants.SCREEN_WIDTH // 2, current_y))
             self.line_rects.append(rect)
-            current_y += surf.get_height()
+            current_y += surf.get_height() + spacing
 
         # Utworzenie obiektów do zarządzania owocami i bombami
         self.entity_group = pygame.sprite.Group()
@@ -80,18 +119,6 @@ class NinjaFruitGame:
         self.fruit_chance_current = 0.5
         self.bomb_chance_current = 0.3
         self.spawner.set_chances(self.fruit_chance_current, self.bomb_chance_current)
-        self.start_surf = self.small_font.render(
-            "Press S to start", True, constants.WHITE
-        )
-        self.start_rect = self.start_surf.get_rect(
-            center=(constants.SCREEN_WIDTH // 2, 505)
-        )
-        self.quit_surf = self.small_font.render(
-            "Press ESC to quit", True, constants.WHITE
-        )
-        self.quit_rect = self.quit_surf.get_rect(
-            center=(constants.SCREEN_WIDTH // 2, 530)
-        )
 
         # Utworzenie obiektów do zarządzania owocami i bombami
         self.entity_group = pygame.sprite.Group()
@@ -146,11 +173,14 @@ class NinjaFruitGame:
     def _setup_voice_control(self):
         phrases = [
             (["start", "run", "go", "begin", "play"], self._start_game),
-            (["menu", "back", "man"], self._go_to_menu),
+            (["menu", "back", "man", "men", "many"], self._go_to_menu),
             (["restart", "retry", "play again"], self._restart_game),
             (["quit", "exit", "stop"], self._quit_game),
             (["mouse", "mouse control"], self._set_mouse_control),  # sterowanie myszką
-            (["hand", "hand control"], self._set_hand_control),  # sterowanie ręką
+            (
+                ["hand", "hand control", "and"],
+                self._set_hand_control,
+            ),  # sterowanie ręką
             (["classic", "normal mode", "normal", "one"], self._set_classic_mode),
             (["time", "time attack", "two", "too"], self._set_time_mode),
             (["level", "levels", "level mode", "three", "free"], self._set_levels_mode),
@@ -172,14 +202,21 @@ class NinjaFruitGame:
         )
 
     def _start_game(self):
+        pygame.mixer.music.load(self.music_game)
+        pygame.mixer.music.set_volume(0.5)
+        pygame.mixer.music.play(-1)
         if self.state == 0:
             self.state = 1
 
     def _go_to_menu(self):
-        self._restart_game()
+        self._reset_game()
         self.state = 0
 
     def _restart_game(self):
+        self._reset_game()
+        self._start_game()
+
+    def _reset_game(self):
         if self.state == 2:
             self.score = 0
             self.lives = 3
@@ -187,10 +224,8 @@ class NinjaFruitGame:
             self.prev_pos = None
             self.current_pos = None
             self.times_up = 0
-            if self.state == 2:
-                self.state = 1
-            else:
-                self.state = 0
+            self.state = 1
+
             if self.game_mode == self.MODE_TIME_ATTACK:
                 self.time_left = self.MODE_TIME_TIME * constants.FPS
             if self.game_mode == self.MODE_LEVELS:
@@ -199,7 +234,7 @@ class NinjaFruitGame:
 
     def _set_classic_mode(self):
         self.game_mode = self.MODE_CLASSIC
-        self._restart_game()
+        self._reset_game()
 
     def _update_classic_difficulty(self):
         self.fruit_chance_current += 0.0001
@@ -213,7 +248,7 @@ class NinjaFruitGame:
     def _set_time_mode(self):
         self.spawner.set_chances(0.7, 0.55)
         self.game_mode = self.MODE_TIME_ATTACK
-        self._restart_game()
+        self._reset_game()
 
     def _update_time(self):
         self.time_left -= 1
@@ -224,7 +259,7 @@ class NinjaFruitGame:
 
     def _set_levels_mode(self):
         self.game_mode = self.MODE_LEVELS
-        self._restart_game()
+        self._reset_game()
 
     def _update_level(self):
         self.level_time -= 1
@@ -318,19 +353,12 @@ class NinjaFruitGame:
                 if event.key == pygame.K_ESCAPE:
                     self._quit_game()
                 elif event.key == pygame.K_s and self.state == 0:
-                    pygame.mixer.music.load(self.music_game)
-                    pygame.mixer.music.set_volume(0.5)
-                    pygame.mixer.music.play(-1)
                     self._start_game()
                 elif event.key == pygame.K_r and self.state == 2:
-                    pygame.mixer.music.load(self.music_game)
-                    pygame.mixer.music.set_volume(0.5)
-                    pygame.mixer.music.play(-1)
-                    self._restart_game()
+                    self._reset_game()
+                    self._start_game()
                 elif event.key == pygame.K_m and self.state == 0:
                     self._set_mouse_control()
-                    print("M")
-                    print(self.state)
                 elif event.key == pygame.K_h and self.state == 0:
                     self._set_hand_control()
                 elif event.key == pygame.K_1 and self.state == 0:
@@ -362,9 +390,6 @@ class NinjaFruitGame:
                 self.prev_pos = None
                 self.current_pos = None
                 self.pointer_trail.clear()
-
-            # self.prev_mouse_pos = self.current_mouse_pos
-            # self.current_mouse_pos = pygame.mouse.get_pos()
 
             for entity in self.entity_group:
                 if entity.check_slice(self.prev_pos, self.new_pos):
@@ -420,6 +445,27 @@ class NinjaFruitGame:
     #     self.screen.fill(constants.BLACK)
     #     # 0 - menu  1 - gra  2 - game over
 
+    def draw_text_with_shadow(
+        self,
+        screen,
+        font,
+        text,
+        center_pos,
+        color,
+        shadow_color=(0, 0, 0),
+        offset=(2, 2),
+    ):
+        text_surf = font.render(text, True, color)
+        shadow_surf = font.render(text, True, shadow_color)
+
+        text_rect = text_surf.get_rect(center=center_pos)
+        shadow_rect = shadow_surf.get_rect(
+            center=(center_pos[0] + offset[0], center_pos[1] + offset[1])
+        )
+
+        screen.blit(shadow_surf, shadow_rect)
+        screen.blit(text_surf, text_rect)
+
     def _draw(self):
         if self.state == 0:
             self.screen.blit(self.background_menu, (0, 0))
@@ -429,31 +475,112 @@ class NinjaFruitGame:
             self.screen.blit(self.background_gameover, (0, 0))
 
         if self.state == 0:
+            # for surf, rect in zip(self.line_surfs, self.line_rects):
+            #     self.screen.blit(surf, rect)
+            # self.screen.blit(self.quit_surf, self.quit_rect)
+            # self.screen.blit(self.start_surf, self.start_rect)
+
+            # # pokaż aktualny tryb
+            # best_text = f"Best Classic: {self.best_score_classic}  |  Best Time: {self.best_score_time}  |  Best Level: {self.best_score_level}"
+            # best_surf = self.small_font.render(best_text, True, (120, 200, 255))
+            # # Set Y to 500
+            # best_rect = best_surf.get_rect(center=(constants.SCREEN_WIDTH // 2, 500))
+            # self.screen.blit(best_surf, best_rect)
+
+            # mode_text = f"Control: {self.control_mode.upper()}  (M=mouse, H=hand)"
+            # mode_surf = self.small_font.render(mode_text, True, (200, 200, 0))
+            # # Set Y to 500 to conflict with best_text
+            # mode_rect = mode_surf.get_rect(center=(constants.SCREEN_WIDTH // 2, 500))
+            # self.screen.blit(mode_surf, mode_rect)
+
+            # mode_info = self.small_font.render(
+            #     f"Mode: {self.game_mode} (1=classic, 2=time, 3=levels)",
+            #     True,
+            #     (180, 180, 180),
+            # )
+            # # Set Y to 500 to conflict with both previous texts
+            # mode_info_rect = mode_info.get_rect(
+            #     center=(constants.SCREEN_WIDTH // 2, 500)
+            # )
+            # self.screen.blit(mode_info, mode_info_rect)
+
+            center_x = constants.SCREEN_WIDTH // 2
+            start_y = 471
+            line_spacing = 30
+
+            self.title_glow_time += self.clock.tick(60) / 1000
+
+            glow_phase = (math.sin(self.title_glow_time * 2) + 1) * 0.5
+            inner_alpha = int(100 + glow_phase * 80)
+            outer_alpha = 180
+
+            # Próba dodania "glow". nie wyszło ale wygląda ok
             for surf, rect in zip(self.line_surfs, self.line_rects):
+                shadow = surf.copy()
+                shadow.fill(
+                    constants.OUTER_SHADOW_COLOR, special_flags=pygame.BLEND_RGBA_MULT
+                )
+                shadow.set_alpha(outer_alpha)
+
+                for dx, dy in [(-3, 0), (3, 0), (0, -3), (0, 3)]:
+                    self.screen.blit(shadow, rect.move(dx, dy))
+
+                glow = surf.copy()
+                glow.fill(
+                    constants.INNER_GLOW_COLOR, special_flags=pygame.BLEND_RGBA_MULT
+                )
+                glow.set_alpha(inner_alpha)
+
+                for dx, dy in [
+                    (-1, 0),
+                    (1, 0),
+                    (0, -1),
+                    (0, 1),
+                    (-1, -1),
+                    (1, 1),
+                    (1, -1),
+                    (-1, 1),
+                ]:
+                    self.screen.blit(glow, rect.move(dx, dy))
+
                 self.screen.blit(surf, rect)
+
             self.screen.blit(self.quit_surf, self.quit_rect)
             self.screen.blit(self.start_surf, self.start_rect)
 
-            # pokaż aktualny tryb
-            best_text = f"Best Classic: {self.best_score_classic}  |  Best Time: {self.best_score_time}  |  Best Level: {self.best_score_level}"
-            best_surf = self.small_font.render(best_text, True, (120, 200, 255))
-            best_rect = best_surf.get_rect(center=(constants.SCREEN_WIDTH // 2, 500))
-            self.screen.blit(best_surf, best_rect)
+            best_text = (
+                f"Best Classic: {self.best_score_classic}  |  "
+                f"Best Time: {self.best_score_time}  |  "
+                f"Best Level: {self.best_score_level}"
+            )
+
+            self.draw_text_with_shadow(
+                self.screen,
+                self.small_font,
+                best_text,
+                (center_x, start_y),
+                (120, 200, 255),
+            )
 
             mode_text = f"Control: {self.control_mode.upper()}  (M=mouse, H=hand)"
-            mode_surf = self.small_font.render(mode_text, True, (200, 200, 0))
-            mode_rect = mode_surf.get_rect(center=(constants.SCREEN_WIDTH // 2, 540))
-            self.screen.blit(mode_surf, mode_rect)
 
-            mode_info = self.small_font.render(
-                f"Mode: {self.game_mode} (1=classic, 2=time, 3=levels)",
-                True,
+            self.draw_text_with_shadow(
+                self.screen,
+                self.small_font,
+                mode_text,
+                (center_x, start_y + line_spacing),
+                (200, 200, 0),
+            )
+
+            mode_info_text = f"Mode: {self.game_mode} (1=classic, 2=time, 3=levels)"
+
+            self.draw_text_with_shadow(
+                self.screen,
+                self.small_font,
+                mode_info_text,
+                (center_x, start_y + 2 * line_spacing),
                 (180, 180, 180),
             )
-            mode_info_rect = mode_info.get_rect(
-                center=(constants.SCREEN_WIDTH // 2, 580)
-            )
-            self.screen.blit(mode_info, mode_info_rect)
 
         elif self.state == 1:
             self.entity_group.draw(self.screen)
@@ -523,36 +650,53 @@ class NinjaFruitGame:
                 self.screen.blit(level_surf, (10, 70))
 
         elif self.state == 2:
+            center_x = constants.SCREEN_WIDTH // 2
+
             if self.game_mode == self.MODE_TIME_ATTACK and self.times_up:
-                self.game_over_surf = self.font.render(
-                    f"Time's Up  Score: {self.score}", True, constants.WHITE
+                self.draw_text_with_shadow(
+                    self.screen,
+                    self.title_font,
+                    f"Time's Up  Score: {self.score}",
+                    (center_x, 200),
+                    constants.WHITE,
+                    offset=(3, 3),
                 )
-                self.game_over_rect = self.game_over_surf.get_rect(
-                    center=(constants.SCREEN_WIDTH // 2, 200)
-                )
-                self.screen.blit(self.game_over_surf, self.game_over_rect)
+
                 if self.best_score_time < self.score:
                     self.best_score_time = self.score
 
             elif self.game_mode == self.MODE_LEVELS and self.level_end:
-                line1 = self.font.render("All levels completed", True, constants.WHITE)
-                line2 = self.font.render(f"Score: {self.score}", True, constants.WHITE)
-                rect1 = line1.get_rect(center=(constants.SCREEN_WIDTH // 2, 110))
-                rect2 = line2.get_rect(center=(constants.SCREEN_WIDTH // 2, 220))
-                self.screen.blit(line1, rect1)
-                self.screen.blit(line2, rect2)
+                self.draw_text_with_shadow(
+                    self.screen,
+                    self.title_font,
+                    "All levels completed",
+                    (center_x, 110),
+                    constants.WHITE,
+                    offset=(3, 3),
+                )
+
+                self.draw_text_with_shadow(
+                    self.screen,
+                    self.title_font,
+                    f"Score: {self.score}",
+                    (center_x, 220),
+                    constants.WHITE,
+                    offset=(3, 3),
+                )
 
                 if self.best_score_level < self.score:
                     self.best_score_level = self.score
 
             else:
-                self.game_over_surf = self.font.render(
-                    f"GAME OVER  Score: {self.score}", True, constants.WHITE
+                self.draw_text_with_shadow(
+                    self.screen,
+                    self.title_font,
+                    f"GAME OVER  Score: {self.score}",
+                    (center_x, 250),
+                    constants.WHITE,
+                    offset=(3, 3),
                 )
-                self.game_over_rect = self.game_over_surf.get_rect(
-                    center=(constants.SCREEN_WIDTH // 2, 200)
-                )
-                self.screen.blit(self.game_over_surf, self.game_over_rect)
+
                 if (
                     self.game_mode == self.MODE_TIME_ATTACK
                     and self.best_score_time < self.score
@@ -569,52 +713,46 @@ class NinjaFruitGame:
                 ):
                     self.best_score_level = self.score
 
-            self.restart_surf = self.small_font.render(
-                "Press R to restart", True, constants.WHITE
+            self.draw_text_with_shadow(
+                self.screen,
+                self.medium_font,
+                "Press R to restart",
+                (center_x, 380),
+                constants.WHITE,
+                offset=(1, 1),
             )
-            self.restart_rect = self.restart_surf.get_rect(
-                center=(constants.SCREEN_WIDTH // 2, 300)
-            )
-            self.screen.blit(self.restart_surf, self.restart_rect)
 
-            self.menu_surf = self.small_font.render(
-                "Press N to go to menu", True, constants.WHITE
+            self.draw_text_with_shadow(
+                self.screen,
+                self.medium_font,
+                "Press N to go to menu",
+                (center_x, 420),
+                constants.WHITE,
+                offset=(1, 1),
             )
-            self.menu_rect = self.menu_surf.get_rect(
-                center=(constants.SCREEN_WIDTH // 2, 340)
-            )
-            self.screen.blit(self.menu_surf, self.menu_rect)
-
-            self.game_over_surf = self.font.render(
-                f"GAME OVER  Score: {self.score}", True, constants.WHITE
-            )
-            self.game_over_rect = self.game_over_surf.get_rect(
-                center=(constants.SCREEN_WIDTH // 2, 210)
-            )
-            self.screen.blit(self.game_over_surf, self.game_over_rect)
-
-            self.restart_surf = self.small_font.render(
-                "Press R to restart", True, constants.WHITE
-            )
-            self.restart_rect = self.restart_surf.get_rect(
-                center=(constants.SCREEN_WIDTH // 2, 500)
-            )
-            self.screen.blit(self.restart_surf, self.restart_rect)
 
         elif self.state == 3:
-            text = f"NEXT LEVEL"
+            center_x = constants.SCREEN_WIDTH // 2
+            center_y = constants.SCREEN_HEIGHT // 2
 
-            surf = self.font.render(text, True, constants.WHITE)
-            rect = surf.get_rect(
-                center=(constants.SCREEN_WIDTH // 2, constants.SCREEN_HEIGHT // 2)
+            self.draw_text_with_shadow(
+                self.screen,
+                self.title_font,
+                "NEXT LEVEL",
+                (center_x, center_y),
+                constants.WHITE,
+                shadow_color=(0, 0, 0),
+                offset=(3, 3),
             )
 
-            self.screen.blit(surf, rect)
-
-            sub = self.small_font.render("Get Ready...", True, (200, 200, 200))
-            sub_rect = sub.get_rect(
-                center=(constants.SCREEN_WIDTH // 2, constants.SCREEN_HEIGHT // 2 + 80)
+            self.draw_text_with_shadow(
+                self.screen,
+                self.small_font,
+                "Get Ready...",
+                (center_x, center_y + 80),
+                (200, 200, 200),
+                shadow_color=(0, 0, 0),
+                offset=(1, 1),
             )
-            self.screen.blit(sub, sub_rect)
 
         pygame.display.flip()
