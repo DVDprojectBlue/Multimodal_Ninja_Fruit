@@ -15,3 +15,9 @@ MANIFEST
 venv/
 ENV/
 env/
+env/
+.env_nf/
+
+# Vosk speech models
+src/voskListener/vosk-model-*/
+src/voskListener/vosk-model-*.zip

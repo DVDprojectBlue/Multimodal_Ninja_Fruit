@@ -7,10 +7,13 @@ name = "ninja-fruit"
 version = "0.1.0"
 description = "Multimodal Ninja Fruit Game by DVD Project Blue."
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.8,<3.12"
 keywords = ["game", "pygame", "ninja", "arcade"]
 dependencies = [
-    "pygame"
+    "pygame",
+    "vosk",
+    "sounddevice",
+    "mediapipe==0.10.8"
 ]
 
 [project.urls]

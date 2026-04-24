@@ -33,7 +33,7 @@ class Entity(pygame.sprite.Sprite):
         self.rect.y += self.vy
         self.vy += self.gravity
 
-        if self.vy > 15: 
+        if self.vy > 15:
             self.vy = 15
 
     def update(self):
