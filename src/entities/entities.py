@@ -2,13 +2,26 @@ import pygame
 import random
 import src.constants as constants
 
+
 class Entity(pygame.sprite.Sprite):
     def __init__(self, image, entity_type, x, vx, vy, y=constants.SCREEN_HEIGHT, half='left'):
         super().__init__()
         self.entity_type = entity_type
-        raw = pygame.image.load(image).convert_alpha()
-        self.image = pygame.transform.scale(raw, (64, 64))
-        self.rect = self.image.get_rect(midbottom = (x, y))
+        if isinstance(image, list):
+            self.frames = [pygame.transform.scale(pygame.image.load(f).convert_alpha(), (64, 64)) for f in image]
+            if vx > 0:
+                self.animation_speed = 0.2
+            else:
+                self.animation_speed = -0.2
+                self.frame_index = len(self.frames) - 1
+            self.frame_index = 0 if vx > 0 else len(self.frames) - 1
+            self.image = self.frames[int(self.frame_index)]
+        else:
+            raw = pygame.image.load(image).convert_alpha()
+            self.image = pygame.transform.scale(raw, (64, 64))
+            self.frames = None
+
+        self.rect = self.image.get_rect(midbottom=(x, y))
 
         self.vx = vx
         self.vy = vy
@@ -24,7 +37,15 @@ class Entity(pygame.sprite.Sprite):
 
     def update(self):
         self.move()
-        
+
+        if self.frames:
+            self.frame_index += self.animation_speed
+            if self.frame_index >= len(self.frames):
+                self.frame_index = 0
+            elif self.frame_index < 0:
+                self.frame_index = len(self.frames) - 1
+            self.image = self.frames[int(self.frame_index)]
+
         if self.rect.top > 700:
             self.kill()
 
@@ -71,3 +92,37 @@ class Spawner:
 
             self.entity_group.add(Entity(self.bomb_image, constants.BOMB, x, vx, vy))
             self.timer_bomb = 0
+
+class Explosion(pygame.sprite.Sprite):
+    def __init__(self, x, y, frames):
+        super().__init__()
+        self.frames = frames
+        self.frame_index = 0
+        self.animation_speed = 0.3
+        self.image = self.frames[0]
+        self.rect = self.image.get_rect(center=(x, y))
+
+    def update(self):
+        self.frame_index += self.animation_speed
+        if self.frame_index >= len(self.frames):
+            self.kill()
+            return
+        self.image = self.frames[int(self.frame_index)]
+        self.rect = self.image.get_rect(center=self.rect.center)
+
+class SwingAnimation(pygame.sprite.Sprite):
+    def __init__(self, x, y, frames):
+        super().__init__()
+        self.frames = frames
+        self.frame_index = 0
+        self.animation_speed = 0.6
+        self.image = self.frames[0]
+        self.rect = self.image.get_rect(center=(x, y))
+
+    def update(self):
+        self.frame_index += self.animation_speed
+        if self.frame_index >= len(self.frames):
+            self.kill()
+            return
+        self.image = self.frames[int(self.frame_index)]
+        self.rect = self.image.get_rect(center=self.rect.center)

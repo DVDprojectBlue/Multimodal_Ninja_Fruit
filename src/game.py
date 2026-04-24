@@ -1,7 +1,8 @@
 import pygame
 import os
+import random
 import src.constants as constants
-from src.entities import Entity, Spawner
+from src.entities import Entity, Spawner, Explosion, SwingAnimation
 
 class NinjaFruitGame:
     def __init__(self, title="Multimodal Ninja Fruit"):
@@ -41,22 +42,74 @@ class NinjaFruitGame:
         self.entity_group = pygame.sprite.Group()
 
         # Ładowanie ścieżek do obrazków
-        self.img_orange = os.path.join(constants.IMAGES_PATH, "orange.png")
-        self.img_orange_left = os.path.join(constants.IMAGES_PATH, "orange_left.png")
-        self.img_orange_right = os.path.join(constants.IMAGES_PATH, "orange_right.png")
-        self.img_bomb = os.path.join(constants.IMAGES_PATH, "bomb.png")
+        self.img_orange_frames = [
+            os.path.join(constants.IMAGES_ORANGE_PATH, "orange0.png"),
+            os.path.join(constants.IMAGES_ORANGE_PATH, "orange45.png"),
+            os.path.join(constants.IMAGES_ORANGE_PATH, "orange90.png"),
+            os.path.join(constants.IMAGES_ORANGE_PATH, "orange135.png"),
+            os.path.join(constants.IMAGES_ORANGE_PATH, "orange180.png"),
+            os.path.join(constants.IMAGES_ORANGE_PATH, "orange225.png"),
+            os.path.join(constants.IMAGES_ORANGE_PATH, "orange270.png"),
+            os.path.join(constants.IMAGES_ORANGE_PATH, "orange315.png"),
+        ]
+        self.img_orange_left = os.path.join(constants.IMAGES_ORANGE_PATH, "orange_left.png")
+        self.img_orange_right = os.path.join(constants.IMAGES_ORANGE_PATH, "orange_right.png")
+
+        # Klatki animacji wybuchu
+        self.explosion_frames = [
+            pygame.transform.scale(
+                pygame.image.load(os.path.join(constants.IMAGES_EXPLOSION_PATH, f"explosion ({i}).png")).convert_alpha(),
+                (128, 128)
+            )
+            for i in range(1, 12)
+        ]
+
+        # Dźwięki wybuchu
+        self.explosion_sounds = [
+            pygame.mixer.Sound(os.path.join(constants.SOUNDS_EXPLOSION_PATH, f"explosion_{i}.mp3"))
+            for i in range(1, 5)
+        ]
+
+        # Dźwięk gongu
+        self.gong_sound = pygame.mixer.Sound(os.path.join(constants.SOUNDS_PATH, "gong.mp3"))
+
+        # Klatki animacji cięcia kataną
+        self.swing_frames = [
+            pygame.transform.scale(
+                pygame.image.load(os.path.join(constants.IMAGES_SWING_PATH, f"swing ({i}).png")).convert_alpha(),
+                (128, 128)
+            )
+            for i in range(1, 10)
+        ]
+
+        # Dźwięki katany
+        self.katana_sounds = [
+            pygame.mixer.Sound(os.path.join(constants.SOUNDS_KATANA_PATH, f"katana_{i}.mp3"))
+            for i in range(0, 5)
+        ]
+        self.katana_bonk = pygame.mixer.Sound(os.path.join(constants.SOUNDS_KATANA_PATH, "katana_bomb.mp3"))
+
+        self.img_bomb_frames = [
+            os.path.join(constants.IMAGES_BOMB_PATH, "bomb0.png"),
+            os.path.join(constants.IMAGES_BOMB_PATH, "bomb22.png"),
+            os.path.join(constants.IMAGES_BOMB_PATH, "bomb45.png"),
+            os.path.join(constants.IMAGES_BOMB_PATH, "bomb22.png"),
+            os.path.join(constants.IMAGES_BOMB_PATH, "bomb0.png"),
+            os.path.join(constants.IMAGES_BOMB_PATH, "bomb-22.png"),
+            os.path.join(constants.IMAGES_BOMB_PATH, "bomb-45.png"),
+            os.path.join(constants.IMAGES_BOMB_PATH, "bomb-22.png"),
+        ]
 
         # Tła
-        bg_raw = pygame.image.load(os.path.join(constants.IMAGES_PATH, "background_main.png")).convert()
+        bg_raw = pygame.image.load(os.path.join(constants.IMAGES_BG_PATH, "background_main.png")).convert()
         self.background_game = pygame.transform.scale(bg_raw, (constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT))
 
-        bg_menu_raw = pygame.image.load(os.path.join(constants.IMAGES_PATH, "background_menu.png")).convert()
+        bg_menu_raw = pygame.image.load(os.path.join(constants.IMAGES_BG_PATH, "background_menu.png")).convert()
         self.background_menu = pygame.transform.scale(bg_menu_raw, (constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT))
 
-        bg_gameover_raw = pygame.image.load(os.path.join(constants.IMAGES_PATH, "background_gameover.png")).convert()
+        bg_gameover_raw = pygame.image.load(os.path.join(constants.IMAGES_BG_PATH, "background_gameover.png")).convert()
         self.background_gameover = pygame.transform.scale(bg_gameover_raw, (constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT))
-
-        self.spawner = Spawner(self.entity_group, [self.img_orange], self.img_bomb)
+        self.spawner = Spawner(self.entity_group, [self.img_orange_frames], self.img_bomb_frames)
 
         self.spawner.set_chances(0.4, 0.1)
 
@@ -72,6 +125,7 @@ class NinjaFruitGame:
         # Cięcie owoców/bomb
         self.lives = 3
         self.score = 0
+        self.death_timer = 0
         self.prev_mouse_pos = None
         self.current_mouse_pos = None
 
@@ -95,9 +149,11 @@ class NinjaFruitGame:
                 pygame.mixer.music.load(self.music_game)
                 pygame.mixer.music.set_volume(0.5)
                 pygame.mixer.music.play(-1)
+                self.gong_sound.play()
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_r and self.state == 2:
                 self.score = 0
                 self.lives = 3
+                self.death_timer = 0
                 self.state = 1
                 pygame.mixer.music.load(self.music_game)
                 pygame.mixer.music.set_volume(0.5)
@@ -112,24 +168,39 @@ class NinjaFruitGame:
             self.prev_mouse_pos = self.current_mouse_pos
             self.current_mouse_pos = pygame.mouse.get_pos()
 
-            for entity in self.entity_group:
+            for entity in list(self.entity_group):
+                if isinstance(entity, (Explosion, SwingAnimation)):
+                    continue
                 if entity.check_slice(self.prev_mouse_pos, self.current_mouse_pos):
                     if entity.entity_type == constants.FRUIT:
                         self.score += 1
                         x, y, vx, vy = entity.get_state()
+                        cx, cy = entity.rect.center
                         entity.kill()
 
                         self.entity_group.add(Entity(self.img_orange_left, constants.HALF, x, vx-3, int(-4+vy/2), y=y, half='left'))
                         self.entity_group.add(Entity(self.img_orange_right, constants.HALF, x, vx+3, int(-4+vy/2), y=y, half='right'))
+                        offset_x = -20  # ujemna = w lewo, dodatnia = w prawo
+                        offset_y = -60  # ujemna = w górę, dodatnia = w dół
+                        self.entity_group.add(SwingAnimation(cx + offset_x, cy + offset_y, self.swing_frames))
+                        random.choice(self.katana_sounds).play()
 
                     elif entity.entity_type == constants.BOMB:
                         self.lives -= 1
+                        x, y = entity.rect.center
                         entity.kill()
-                if self.lives <= 0:
-                    self.state = 2
-                    pygame.mixer.music.load(self.music_menu)
-                    pygame.mixer.music.set_volume(0.5)
-                    pygame.mixer.music.play(-1)
+                        self.entity_group.add(Explosion(x, y, self.explosion_frames))
+                        random.choice(self.explosion_sounds).play()
+                        self.katana_bonk.play()
+                if self.lives <= 0 and self.death_timer == 0:
+                    self.death_timer = pygame.time.get_ticks()
+
+            if self.death_timer > 0 and pygame.time.get_ticks() - self.death_timer > 1000:
+                self.death_timer = 0
+                self.state = 2
+                pygame.mixer.music.load(self.music_menu)
+                pygame.mixer.music.set_volume(0.5)
+                pygame.mixer.music.play(-1)
 
     def _draw(self):
         if self.state == 0:
