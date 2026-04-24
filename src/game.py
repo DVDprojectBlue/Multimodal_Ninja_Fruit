@@ -55,6 +55,13 @@ class NinjaFruitGame:
         self.img_orange_left = os.path.join(constants.IMAGES_ORANGE_PATH, "orange_left.png")
         self.img_orange_right = os.path.join(constants.IMAGES_ORANGE_PATH, "orange_right.png")
 
+        self.img_apple_frames = [
+            os.path.join(constants.IMAGES_APPLE_PATH, f"apple ({i}).png")
+            for i in range(1, 9)
+        ]
+        self.img_apple_left = os.path.join(constants.IMAGES_APPLE_PATH, "apple_left.png")
+        self.img_apple_right = os.path.join(constants.IMAGES_APPLE_PATH, "apple_right.png")
+
         # Klatki animacji wybuchu
         self.explosion_frames = [
             pygame.transform.scale(
@@ -109,7 +116,7 @@ class NinjaFruitGame:
 
         bg_gameover_raw = pygame.image.load(os.path.join(constants.IMAGES_BG_PATH, "background_gameover.png")).convert()
         self.background_gameover = pygame.transform.scale(bg_gameover_raw, (constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT))
-        self.spawner = Spawner(self.entity_group, [self.img_orange_frames], self.img_bomb_frames)
+        self.spawner = Spawner(self.entity_group, [self.img_orange_frames, self.img_apple_frames], self.img_bomb_frames)
 
         self.spawner.set_chances(0.4, 0.1)
 
@@ -178,8 +185,15 @@ class NinjaFruitGame:
                         cx, cy = entity.rect.center
                         entity.kill()
 
-                        self.entity_group.add(Entity(self.img_orange_left, constants.HALF, x, vx-3, int(-4+vy/2), y=y, half='left'))
-                        self.entity_group.add(Entity(self.img_orange_right, constants.HALF, x, vx+3, int(-4+vy/2), y=y, half='right'))
+                        if entity.fruit_image_key == self.img_orange_frames[0]:
+                            left_img = self.img_orange_left
+                            right_img = self.img_orange_right
+                        else:
+                            left_img = self.img_apple_left
+                            right_img = self.img_apple_right
+
+                        self.entity_group.add(Entity(left_img, constants.HALF, x, vx-3, int(-4+vy/2), y=y, half='left'))
+                        self.entity_group.add(Entity(right_img, constants.HALF, x, vx+3, int(-4+vy/2), y=y, half='right'))
                         offset_x = -20  # ujemna = w lewo, dodatnia = w prawo
                         offset_y = -60  # ujemna = w górę, dodatnia = w dół
                         self.entity_group.add(SwingAnimation(cx + offset_x, cy + offset_y, self.swing_frames))

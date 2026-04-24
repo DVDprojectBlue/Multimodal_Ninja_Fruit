@@ -9,6 +9,7 @@ class Entity(pygame.sprite.Sprite):
         self.entity_type = entity_type
         if isinstance(image, list):
             self.frames = [pygame.transform.scale(pygame.image.load(f).convert_alpha(), (64, 64)) for f in image]
+            self.fruit_image_key = image[0]
             if vx > 0:
                 self.animation_speed = 0.2
             else:
