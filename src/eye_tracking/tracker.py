@@ -39,7 +39,7 @@ class TrackerStepResult:
 class EyeTracker:
 	"""High-level reusable eye tracking service for pygame/game loops."""
 
-	WORKER_FRAME_DELAY = 0.005
+	WORKER_FRAME_DELAY = 0.003
 
 	def __init__(
 		self,

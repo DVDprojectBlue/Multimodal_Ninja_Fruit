@@ -1,4 +1,4 @@
 camera_source: http://192.168.0.12:8080/video
 eye_context: ninja_fruit_context
-fixation_threshold: 1.0
-calibration_points: 10
+fixation_threshold: 0.8
+calibration_points: 20

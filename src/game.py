@@ -773,6 +773,7 @@ class NinjaFruitGame:
                 self.screen.blit(recalibrate_surf, (10, 100))
 
         elif self.state == self.STATE_CALIBRATION:
+            self.screen.fill(constants.BLACK)
             title = self.title_font.render("Calibrating", True, constants.WHITE)
             title_rect = title.get_rect(center=(constants.SCREEN_WIDTH // 2, 120))
             self.screen.blit(title, title_rect)
