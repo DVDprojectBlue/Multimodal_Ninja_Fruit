@@ -62,6 +62,20 @@ class NinjaFruitGame:
         self.img_apple_left = os.path.join(constants.IMAGES_APPLE_PATH, "apple_left.png")
         self.img_apple_right = os.path.join(constants.IMAGES_APPLE_PATH, "apple_right.png")
 
+        self.img_banana_frames = [
+            os.path.join(constants.IMAGES_BANANA_PATH, f"banana ({i}).png")
+            for i in range(1, 9)
+        ]
+        self.img_banana_left = os.path.join(constants.IMAGES_BANANA_PATH, "banana_left.png")
+        self.img_banana_right = os.path.join(constants.IMAGES_BANANA_PATH, "banana_right.png")
+
+        self.img_watermelon_frames = [
+            os.path.join(constants.IMAGES_WATERMELON_PATH, f"watermelon ({i}).png")
+            for i in range(1, 9)
+        ]
+        self.img_watermelon_left = os.path.join(constants.IMAGES_WATERMELON_PATH, "watermelon_left.png")
+        self.img_watermelon_right = os.path.join(constants.IMAGES_WATERMELON_PATH, "watermelon_right.png")
+        
         # Klatki animacji wybuchu
         self.explosion_frames = [
             pygame.transform.scale(
@@ -116,7 +130,12 @@ class NinjaFruitGame:
 
         bg_gameover_raw = pygame.image.load(os.path.join(constants.IMAGES_BG_PATH, "background_gameover.png")).convert()
         self.background_gameover = pygame.transform.scale(bg_gameover_raw, (constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT))
-        self.spawner = Spawner(self.entity_group, [self.img_orange_frames, self.img_apple_frames], self.img_bomb_frames)
+        self.spawner = Spawner(self.entity_group, [
+            self.img_orange_frames,
+            self.img_apple_frames,
+            self.img_banana_frames,
+            self.img_watermelon_frames
+        ], self.img_bomb_frames)
 
         self.spawner.set_chances(0.4, 0.1)
 
@@ -185,12 +204,13 @@ class NinjaFruitGame:
                         cx, cy = entity.rect.center
                         entity.kill()
 
-                        if entity.fruit_image_key == self.img_orange_frames[0]:
-                            left_img = self.img_orange_left
-                            right_img = self.img_orange_right
-                        else:
-                            left_img = self.img_apple_left
-                            right_img = self.img_apple_right
+                        fruit_map = {
+                            self.img_orange_frames[0]: (self.img_orange_left, self.img_orange_right),
+                            self.img_apple_frames[0]: (self.img_apple_left, self.img_apple_right),
+                            self.img_banana_frames[0]: (self.img_banana_left, self.img_banana_right),
+                            self.img_watermelon_frames[0]: (self.img_watermelon_left, self.img_watermelon_right),
+                        }
+                        left_img, right_img = fruit_map.get(entity.fruit_image_key, (self.img_orange_left, self.img_orange_right))
 
                         self.entity_group.add(Entity(left_img, constants.HALF, x, vx-3, int(-4+vy/2), y=y, half='left'))
                         self.entity_group.add(Entity(right_img, constants.HALF, x, vx+3, int(-4+vy/2), y=y, half='right'))
