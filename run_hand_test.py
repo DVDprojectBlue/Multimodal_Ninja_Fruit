@@ -3,12 +3,12 @@ from src.handControl.hands_detector import HandsDetector
 import cv2
 import urllib.request
 from pathlib import Path
+from src.constants import CAM_URL
 
 def main():
 
-    url = "http://192.168.10.67:8080/video"
 
-    detector = HandsDetector(smoothing=0.3, cam_url=url, debug=True)
+    detector = HandsDetector(smoothing=0.3, cam_url=CAM_URL, debug=True)
     detector.start()
 
     # czekaj aż wątek się skończy (np. naciśnięcie 'q' w oknie kamery)
